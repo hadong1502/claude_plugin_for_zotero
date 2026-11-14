@@ -1,11 +1,24 @@
 // Answer Renderer (pure). Display HTML lands in #6; note HTML and annotation
 // text in #9.
+import MarkdownIt from 'markdown-it';
+
 import { notImplemented } from './not-implemented';
+import { isSafeLinkHref } from './safe-link';
+
+// Created once so later plugins (math, #6) extend the same instance.
+const md = new MarkdownIt({
+  html: false,
+  linkify: true,
+  typographer: false,
+  breaks: false,
+  xhtmlOut: true,
+});
+md.validateLink = isSafeLinkHref;
+md.disable('image');
 
 /** Markdown with LaTeX math to sanitised display HTML. */
 export function renderAnswerHtml(markdown: string): string {
-  void markdown;
-  return notImplemented('renderAnswerHtml', '#6');
+  return md.render(markdown);
 }
 
 /** Question and Answer pairs to Zotero note HTML, with math in Zotero's format. */
