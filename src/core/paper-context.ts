@@ -10,26 +10,37 @@ export const FORCE_PHRASES: readonly string[] = [
   'read the paper',
 ];
 
-const notImplementedYet = (): never => {
-  throw new Error('not implemented (#8)');
-};
+const FORCE_PATTERNS: readonly RegExp[] = FORCE_PHRASES.map(
+  (phrase) => new RegExp(`\\b${phrase.split(' ').join('\\s+')}\\b`, 'i'),
+);
 
-export function wantsFullPaper(_question: string): boolean {
-  return notImplementedYet();
+/** True when the question contains a force phrase as whole words (#1). */
+export function wantsFullPaper(question: string): boolean {
+  return FORCE_PATTERNS.some((re) => re.test(question));
 }
 
-export function resolvePaperContext(_o: {
+/** Paper Context mode: none without a PDF, forced by toggle or phrase (#1). */
+export function resolvePaperContext(o: {
   useFullPaper: boolean;
   question: string;
   hasPdf: boolean;
 }): PaperContextMode {
-  return notImplementedYet();
+  if (!o.hasPdf) return 'none';
+  return o.useFullPaper || wantsFullPaper(o.question) ? 'forced' : 'claude-decides';
 }
 
-export function canReadPdfPath(_path: string): boolean {
-  return notImplementedYet();
+// Only this shape of path has a verified Read rule form (ADR); anything else
+// falls back to extracted text.
+const READABLE_PATH = /^[A-Za-z]:\\[A-Za-z0-9 _.\-()[\]{},#&\\]*$/;
+
+/** True when the absolute Windows path has a verified Read rule form (#8). */
+export function canReadPdfPath(path: string): boolean {
+  return READABLE_PATH.test(path);
 }
 
-export function readRulePath(_path: string): string {
-  return notImplementedYet();
+/** Read rule path per the ADR: `//c/...` with forward slashes, `[]{}` escaped. */
+export function readRulePath(path: string): string {
+  if (!canReadPdfPath(path)) throw new Error('readRulePath: unsupported path');
+  const rest = path.slice(3).replace(/\\/g, '/').replace(/[[\]{}]/g, '\\$&');
+  return `//${path[0].toLowerCase()}/${rest}`;
 }
