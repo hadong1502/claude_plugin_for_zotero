@@ -72,6 +72,12 @@ export class ThreadStore {
     notImplemented('ThreadStore.importExchange', '#10');
   }
 
+  /** Returns the held prior exchange for `key` and forgets it (#10). */
+  takePriorExchange(key: ThreadKey): { question: string; answer: string } | undefined {
+    void key;
+    return notImplemented('ThreadStore.takePriorExchange', '#10');
+  }
+
   /** Calls `listener` with the key of every Thread that changes. */
   subscribe(listener: (key: ThreadKey) => void): () => void {
     this.#listeners.add(listener);
