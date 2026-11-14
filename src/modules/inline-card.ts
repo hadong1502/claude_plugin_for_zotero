@@ -3,7 +3,9 @@
 // with a Quick Action or a typed Inline Question, streams the rendered Answer
 // in, and shows only its latest question: each question starts a fresh
 // session. Closing it (✕, Esc, a new card, the reader closing, shutdown)
-// cancels its run. Answers are inserted only as sanitised fragments.
+// cancels its run. Answers are inserted only as sanitised fragments. A done
+// Answer can be saved as a note or as an annotation on the Selection (#9),
+// only by pressing a button.
 import type { AskController } from '../core/ask-controller';
 import { renderAnswerHtml } from '../core/answer-renderer';
 import { placeCard, type Box, type CardSize } from '../core/card-placement';
@@ -22,6 +24,7 @@ import type {
   TurnStatus,
 } from '../core/types';
 import { INLINE_CARD_CSS } from './inline-card-css';
+import { SaveButton } from './save-button';
 
 const MODELS: ReadonlyArray<readonly [ModelAlias, string]> = [
   ['haiku', 'Haiku'],
@@ -71,6 +74,10 @@ export interface InlineCardDeps {
   openLink(url: string): void;
   /** Called once, after the card has closed. */
   onClose(card: InlineCard): void;
+  /** Saves the question and its Answer as a note of the item. */
+  saveNote(turn: Turn): Promise<unknown>;
+  /** Saves the question and its Answer as a highlight on the Selection. */
+  saveAnnotation(turn: Turn): Promise<unknown>;
 }
 
 export class InlineCard {
@@ -83,6 +90,9 @@ export class InlineCard {
   readonly #question: HTMLElement;
   readonly #answer: HTMLElement;
   readonly #status: HTMLElement;
+  readonly #saves: HTMLElement;
+  readonly #saveNote: SaveButton;
+  readonly #saveAnnotation: SaveButton;
   readonly #input: HTMLInputElement;
   readonly #sendButton: HTMLButtonElement;
   readonly #modelButtons: Array<[ModelAlias, HTMLButtonElement]> = [];
@@ -143,7 +153,22 @@ export class InlineCard {
     this.#question = this.#el('div', 'cfz-card-question');
     this.#answer = this.#el('div', 'cfz-card-answer');
     this.#status = this.#el('div', 'cfz-card-status');
-    this.#body.append(this.#question, this.#answer, this.#status);
+    this.#saveNote = new SaveButton(
+      this.#el('button', 'cfz-card-save-note'),
+      'Save as note',
+      () => this.#saveShown((turn) => this.#deps.saveNote(turn)),
+      deps.logError,
+    );
+    this.#saveAnnotation = new SaveButton(
+      this.#el('button', 'cfz-card-save-annotation'),
+      'Save as annotation',
+      () => this.#saveShown((turn) => this.#deps.saveAnnotation(turn)),
+      deps.logError,
+    );
+    this.#saves = this.#el('div', 'cfz-card-saves');
+    this.#saves.hidden = true;
+    this.#saves.append(this.#saveNote.element, this.#saveAnnotation.element);
+    this.#body.append(this.#question, this.#answer, this.#status, this.#saves);
     // Links in Answers never navigate the reader; allowed ones open in the
     // system browser.
     this.#body.addEventListener('click', (event) => this.#onLinkClick(event));
@@ -225,6 +250,8 @@ export class InlineCard {
   close(): void {
     if (this.#closed) return;
     this.#closed = true;
+    this.#saveNote.dispose();
+    this.#saveAnnotation.dispose();
     for (const dispose of this.#disposers.splice(0)) {
       try {
         dispose();
@@ -278,6 +305,15 @@ export class InlineCard {
       .catch((e: unknown) => this.#deps.logError(e));
   }
 
+  /** Saves the shown turn as it is at the press, if its Answer is done. */
+  #saveShown(save: (turn: Turn) => Promise<unknown>): Promise<unknown> {
+    const turn = this.#deps.store.get(this.key).turns.at(-1);
+    if (!turn || turn.id !== this.#turnId || turn.status !== 'done') {
+      return Promise.reject(new Error('Inline Card: the Answer can no longer be saved'));
+    }
+    return save(turn);
+  }
+
   #isRunning(): boolean {
     const turn = this.#deps.store.get(this.key).turns.at(-1);
     return turn?.status === 'streaming' && this.#deps.controller.isRunning(this.key);
@@ -295,6 +331,7 @@ export class InlineCard {
     if (turn.id !== this.#turnId) this.#resetTurn(turn.id);
     setText(this.#question, turn.question);
     this.#updateAnswer(turn);
+    this.#saves.hidden = turn.status !== 'done';
   }
 
   #resetTurn(turnId: string | null): void {
@@ -308,6 +345,9 @@ export class InlineCard {
     setText(this.#question, '');
     setText(this.#status, '');
     this.#status.hidden = true;
+    this.#saves.hidden = true;
+    this.#saveNote.reset();
+    this.#saveAnnotation.reset();
   }
 
   /** Touches only what changed since the last render. */

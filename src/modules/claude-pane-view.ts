@@ -2,15 +2,18 @@
 // library item pane and each reader tab's context pane). It builds its own
 // elements in the section body and renders the shown Thread from the Thread
 // Store, so every view of one Thread stays in sync. Answers render as
-// Markdown with math (#6), inserted only as sanitised fragments.
+// Markdown with math (#6), inserted only as sanitised fragments. Answers and
+// the whole Thread can be saved as notes (#9), only by pressing a button.
 import type { AskController } from '../core/ask-controller';
 import { renderAnswerHtml } from '../core/answer-renderer';
 import { errorCopy } from '../core/failure';
 import { itemContextFrom, type ItemLike } from '../core/item-context';
 import { htmlToFragment } from '../core/safe-html';
 import { isSafeLinkHref } from '../core/safe-link';
+import { isSaveableTurn, saveableTurns } from '../core/saving';
 import type { ThreadStore } from '../core/thread-store';
-import type { ModelAlias, ThreadKey, Turn, TurnStatus } from '../core/types';
+import type { ModelAlias, Thread, ThreadKey, Turn, TurnStatus } from '../core/types';
+import { SaveButton } from './save-button';
 
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
@@ -33,6 +36,10 @@ export interface ClaudePaneViewDeps {
   logError(e: unknown): void;
   /** Opens an allowed link (see isSafeLinkHref) outside Zotero, in the system browser. */
   openLink(url: string): void;
+  /** Saves one question and its Answer as a note of the Thread's item. */
+  saveAnswerNote(key: ThreadKey, turn: Turn): Promise<unknown>;
+  /** Saves the Thread's saveable turns as one note of its item. */
+  saveThreadNote(key: ThreadKey, thread: Thread): Promise<unknown>;
 }
 
 interface TurnElements {
@@ -40,6 +47,8 @@ interface TurnElements {
   question: HTMLElement;
   answer: HTMLElement;
   status: HTMLElement;
+  /** "Save as note", shown once the turn can be saved. */
+  save: SaveButton;
   /** The Answer text and status last rendered; null before the first render. */
   renderedAnswer: string | null;
   renderedStatus: TurnStatus | null;
@@ -62,6 +71,7 @@ export class ClaudePaneView {
   readonly #input: HTMLTextAreaElement;
   readonly #modelPicker: MenuList;
   readonly #clearButton: HTMLButtonElement;
+  readonly #saveThreadButton: SaveButton;
   readonly #sendButton: HTMLButtonElement;
   readonly #turns = new Map<string, TurnElements>();
   readonly #unsubscribe: () => void;
@@ -102,6 +112,13 @@ export class ClaudePaneView {
       if (this.#target) this.#deps.controller.clear(this.#target.key);
     });
 
+    this.#saveThreadButton = new SaveButton(
+      this.#html('button', 'claude-pane-save-thread'),
+      'Save Thread as note',
+      () => this.#saveThread(),
+      deps.logError,
+    );
+
     this.#sendButton = this.#html('button', 'claude-pane-send');
     this.#sendButton.addEventListener('click', () => {
       if (!this.#target) return;
@@ -113,7 +130,13 @@ export class ClaudePaneView {
     spacer.style.flex = '1';
     const controls = this.#html('div', 'claude-pane-controls');
     controls.style.cssText = 'display: flex; align-items: center; gap: 6px;';
-    controls.append(this.#modelPicker, spacer, this.#clearButton, this.#sendButton);
+    controls.append(
+      this.#modelPicker,
+      spacer,
+      this.#saveThreadButton.element,
+      this.#clearButton,
+      this.#sendButton,
+    );
 
     this.#root.append(this.#thread, this.#input, controls);
     body.append(this.#root);
@@ -129,19 +152,18 @@ export class ClaudePaneView {
     const keyChanged = target?.key !== this.#target?.key;
     this.#target = target;
     if (keyChanged) {
-      for (const turn of this.#turns.values()) {
-        this.#cancelFrame(turn);
-        turn.root.remove();
-      }
+      for (const turn of this.#turns.values()) this.#removeTurn(turn);
       this.#turns.clear();
+      this.#saveThreadButton.reset();
     }
     this.#render();
   }
 
   destroy(): void {
     this.#unsubscribe();
-    for (const turn of this.#turns.values()) this.#cancelFrame(turn);
+    for (const turn of this.#turns.values()) this.#removeTurn(turn);
     this.#turns.clear();
+    this.#saveThreadButton.dispose();
     this.#target = null;
     this.#root.remove();
   }
@@ -171,8 +193,7 @@ export class ClaudePaneView {
     const ids = new Set(turns.map((turn) => turn.id));
     for (const [id, elements] of this.#turns) {
       if (!ids.has(id)) {
-        this.#cancelFrame(elements);
-        elements.root.remove();
+        this.#removeTurn(elements);
         this.#turns.delete(id);
       }
     }
@@ -180,12 +201,12 @@ export class ClaudePaneView {
     // Answer survives; only new turns are appended, in order.
     for (const turn of turns) {
       let elements = this.#turns.get(turn.id);
-      if (!elements) {
-        elements = this.#buildTurn();
+      if (!elements && this.#target) {
+        elements = this.#buildTurn(this.#target.key, turn.id);
         this.#turns.set(turn.id, elements);
         this.#thread.append(elements.root);
       }
-      this.#updateTurn(elements, turn);
+      if (elements) this.#updateTurn(elements, turn);
     }
 
     const running = this.#isRunning();
@@ -193,10 +214,33 @@ export class ClaudePaneView {
     this.#sendButton.textContent = running ? 'Stop' : 'Send';
     this.#sendButton.disabled = !enabled;
     this.#clearButton.disabled = !enabled || turns.length === 0;
+    this.#saveThreadButton.setEnabled(enabled && saveableTurns(turns).length > 0);
     this.#input.disabled = !enabled;
   }
 
-  #buildTurn(): TurnElements {
+  /** Saves the shown Thread as it is at the press. */
+  #saveThread(): Promise<unknown> {
+    const target = this.#target;
+    if (!target) return Promise.reject(new Error('Claude Pane: no Thread shown'));
+    return this.#deps.saveThreadNote(target.key, this.#deps.store.get(target.key));
+  }
+
+  /** Saves one turn as it is at the press. */
+  #saveTurn(key: ThreadKey, turnId: string): Promise<unknown> {
+    const turn = this.#deps.store.get(key).turns.find((t) => t.id === turnId);
+    if (!turn || !isSaveableTurn(turn)) {
+      return Promise.reject(new Error('Claude Pane: the Answer can no longer be saved'));
+    }
+    return this.#deps.saveAnswerNote(key, turn);
+  }
+
+  #removeTurn(elements: TurnElements): void {
+    this.#cancelFrame(elements);
+    elements.save.dispose();
+    elements.root.remove();
+  }
+
+  #buildTurn(key: ThreadKey, turnId: string): TurnElements {
     const root = this.#html('div', 'claude-pane-turn');
     root.style.cssText = 'display: flex; flex-direction: column; gap: 4px; user-select: text;';
     const question = this.#html('div', 'claude-pane-question');
@@ -206,12 +250,21 @@ export class ClaudePaneView {
     answer.style.cssText = 'overflow-wrap: anywhere;';
     const status = this.#html('div', 'claude-pane-status');
     status.style.cssText = 'white-space: pre-wrap; overflow-wrap: anywhere;';
-    root.append(question, answer, status);
+    const save = new SaveButton(
+      this.#html('button', 'claude-pane-save-answer'),
+      'Save as note',
+      () => this.#saveTurn(key, turnId),
+      this.#deps.logError,
+    );
+    save.element.hidden = true;
+    save.element.style.alignSelf = 'flex-start';
+    root.append(question, answer, status, save.element);
     return {
       root,
       question,
       answer,
       status,
+      save,
       renderedAnswer: null,
       renderedStatus: null,
       pendingAnswer: '',
@@ -222,6 +275,7 @@ export class ClaudePaneView {
   /** Touches only what changed since the turn's last render. */
   #updateTurn(elements: TurnElements, turn: Turn): void {
     setText(elements.question, turn.question);
+    elements.save.element.hidden = !isSaveableTurn(turn);
 
     const statusChanged = turn.status !== elements.renderedStatus;
     const answerChanged = turn.answer !== elements.renderedAnswer;

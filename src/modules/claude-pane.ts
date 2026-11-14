@@ -6,10 +6,12 @@ import { AskController } from '../core/ask-controller';
 import type { ItemLike } from '../core/item-context';
 import { ClaudeRunner } from '../core/runner';
 import { ThreadStore } from '../core/thread-store';
+import type { Thread, ThreadKey, Turn } from '../core/types';
 import { getPluginInfo } from '../plugin-info';
 import { ClaudePaneView, type PaneTarget } from './claude-pane-view';
 import { getCliPath } from './cli-locator';
 import { ensureCliWorkdir } from './cli-workdir';
+import { saveAnswerNote, saveThreadNote } from './library-writer';
 import { getPref } from './prefs';
 import { createSubprocessPort } from './subprocess-port';
 
@@ -67,6 +69,10 @@ export function registerClaudePane(): void {
       defaultModel: () => getPref('defaultModel'),
       logError,
       openLink: (url: string) => Zotero.launchURL(url),
+      saveAnswerNote: async (key: ThreadKey, turn: Turn) =>
+        saveAnswerNote(await threadItem(key), turn),
+      saveThreadNote: async (key: ThreadKey, thread: Thread) =>
+        saveThreadNote(await threadItem(key), thread),
     };
 
     const sectionKey = Zotero.ItemPaneManager.registerSection({
@@ -143,6 +149,13 @@ function paneTarget(item: Zotero.Item | null | undefined): PaneTarget | null {
   const key = item.isAttachment() && item.parentItemID ? item.parentItemID : item.id;
   const metadataItem = (key === item.id ? item : Zotero.Items.get(key)) || item;
   return { key, item: itemLike(metadataItem) };
+}
+
+/** The item a Thread belongs to (its key is the item's ID), where Saved Notes go. */
+async function threadItem(key: ThreadKey): Promise<Zotero.Item> {
+  const item = await Zotero.Items.getAsync(key);
+  if (!item) throw new Error(`Claude Pane: item ${key} not found`);
+  return item;
 }
 
 /** Reads base-mapped fields too, e.g. a case's name as its title. */

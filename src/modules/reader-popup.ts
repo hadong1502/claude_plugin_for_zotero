@@ -2,7 +2,9 @@
 // PDF reader's text-selection popup; pressing it opens one Inline Card
 // (inline-card.ts) anchored to the Selection. Inline Questions run through
 // their own Thread Store and Ask Controller, never the Claude Pane's Thread.
-// Only one card exists at a time, across all reader tabs.
+// Only one card exists at a time, across all reader tabs. The card's save
+// buttons (#9) write a note of the item, or a highlight on the Selection from
+// the popup's annotation as captured at the press.
 //
 // Reader internals used here (Zotero 10.0.8, resource://zotero/reader/reader.js):
 // the selection popup renders inside `.primary-view` or `.secondary-view` of
@@ -14,12 +16,14 @@ import { AskController } from '../core/ask-controller';
 import type { Box } from '../core/card-placement';
 import { itemContextFrom, type ItemLike } from '../core/item-context';
 import { ClaudeRunner } from '../core/runner';
+import type { SelectionAnnotation } from '../core/saving';
 import { ThreadStore } from '../core/thread-store';
 import type { ItemContext } from '../core/types';
 import { getPluginInfo } from '../plugin-info';
 import { getCliPath } from './cli-locator';
 import { ensureCliWorkdir } from './cli-workdir';
 import { InlineCard, removeStyles, type CapturedSelection, type CardAnchor } from './inline-card';
+import { saveAnnotation, saveAnswerNote } from './library-writer';
 import { getPref } from './prefs';
 import { createSubprocessPort } from './subprocess-port';
 
@@ -40,8 +44,11 @@ interface InternalReaderLike {
   _activeSecondaryView?: PdfViewLike | null;
 }
 
-/** The selection popup's annotation, as far as this module uses it. */
-interface SelectionAnnotation {
+/** The selection popup's annotation (`params.annotation`), as far as this module uses it. */
+interface PopupAnnotation {
+  type?: unknown;
+  color?: unknown;
+  sortIndex?: unknown;
   text?: unknown;
   pageLabel?: unknown;
   position?: { pageIndex?: unknown; rects?: unknown };
@@ -111,7 +118,7 @@ function onSelectionPopup(event: PopupEvent): void {
   const button = doc.createElement('button');
   button.className = `toolbar-button wide-button ${BUTTON_CLASS}`;
   button.textContent = 'Ask Claude';
-  const annotation = params.annotation as unknown as SelectionAnnotation;
+  const annotation = params.annotation as unknown as PopupAnnotation;
   button.addEventListener('click', () =>
     guard(() => openCard(reader as unknown as ReaderLike, doc, annotation, button)),
   );
@@ -126,13 +133,14 @@ interface ReaderLike {
 function openCard(
   reader: ReaderLike,
   doc: Document,
-  annotation: SelectionAnnotation,
+  annotation: PopupAnnotation,
   button: HTMLElement,
 ): void {
   const current = registration;
   if (!current) return;
   // Captured now, so the card outlives the popup.
   const selection = captureSelection(annotation);
+  const selectionAnnotation = captureAnnotation(annotation);
   const anchor = createAnchor(reader, doc, annotation, button);
   const attachment = reader._item;
 
@@ -149,10 +157,48 @@ function openCard(
     onClose: (card) => {
       if (current.card === card) current.card = null;
     },
+    saveNote: async (turn) => saveAnswerNote(await noteItemOf(attachment), turn),
+    saveAnnotation: async (turn) => {
+      if (!selectionAnnotation) throw new Error('Inline Card: the Selection was not captured');
+      return saveAnnotation(attachment, selectionAnnotation, turn.question, turn.answer);
+    },
   });
 }
 
-function captureSelection(annotation: SelectionAnnotation): CapturedSelection {
+/**
+ * The popup's annotation as plain data, copied at the press so a Saved
+ * Annotation outlives the popup; null if it has no position.
+ */
+function captureAnnotation(annotation: PopupAnnotation): SelectionAnnotation | null {
+  let position: unknown;
+  try {
+    position = JSON.parse(JSON.stringify(annotation.position ?? null));
+  } catch (e) {
+    logError(e);
+    return null;
+  }
+  if (!position || typeof position !== 'object') return null;
+  const text = (value: unknown): string | undefined =>
+    value === undefined || value === null ? undefined : String(value);
+  return {
+    type: text(annotation.type),
+    color: text(annotation.color),
+    sortIndex: text(annotation.sortIndex),
+    pageLabel: text(annotation.pageLabel),
+    position,
+    text: text(annotation.text),
+  };
+}
+
+/** Where a Saved Note of a reader's attachment goes: its parent item, or the attachment itself. */
+async function noteItemOf(attachment: Zotero.Item): Promise<Zotero.Item> {
+  if (!attachment.parentItemID) return attachment;
+  const parent = await Zotero.Items.getAsync(attachment.parentItemID);
+  if (!parent) throw new Error(`Inline Card: item ${attachment.parentItemID} not found`);
+  return parent;
+}
+
+function captureSelection(annotation: PopupAnnotation): CapturedSelection {
   const text = typeof annotation.text === 'string' ? annotation.text : String(annotation.text ?? '');
   const pageLabel =
     annotation.pageLabel === undefined || annotation.pageLabel === null || annotation.pageLabel === ''
@@ -175,7 +221,7 @@ function captureSelection(annotation: SelectionAnnotation): CapturedSelection {
 function createAnchor(
   reader: ReaderLike,
   doc: Document,
-  annotation: SelectionAnnotation,
+  annotation: PopupAnnotation,
   button: HTMLElement,
 ): CardAnchor {
   const primary = !button.closest('.secondary-view');

@@ -100,6 +100,15 @@ export const INLINE_CARD_CSS = `
 .cfz-card-status.cfz-card-error {
   color: var(--accent-red, #d00);
 }
+.cfz-card-saves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 2px;
+}
+.cfz-card-saves[hidden] {
+  display: none;
+}
 .cfz-card-input-row,
 .cfz-card-models {
   display: flex;
