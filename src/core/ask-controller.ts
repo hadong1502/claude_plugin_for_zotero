@@ -51,6 +51,9 @@ interface Run {
   cancelRequested: boolean;
   /** The Thread was cleared: ignore every later event of this run. */
   discarded: boolean;
+  /** Settles when Stop or Clear hits this run; races a pending paper load (#8). */
+  cancelSignal: Promise<void>;
+  signalCancel(): void;
 }
 
 export class AskController {
@@ -75,7 +78,11 @@ export class AskController {
     if (text === '' || this.#runs.has(key)) return;
 
     // Marked running synchronously, before any await.
-    const run: Run = { runner: null, cancelRequested: false, discarded: false };
+    let signalCancel: () => void = () => {};
+    const cancelSignal = new Promise<void>((resolve) => {
+      signalCancel = resolve;
+    });
+    const run: Run = { runner: null, cancelRequested: false, discarded: false, cancelSignal, signalCancel };
     this.#runs.set(key, run);
     const { store } = this.#deps;
     try {
@@ -83,7 +90,13 @@ export class AskController {
       // Started before the paper is loaded so the runner is requested without delay.
       const runnerReady = this.#deps.createRunner();
       runnerReady.catch(() => {});
-      const paperInput = await this.#choosePaper(options, text);
+      const paperInput = await this.#choosePaper(options, text, run);
+      // Stop or Clear during the paper load: nothing else is consumed or started.
+      if (run.discarded) return;
+      if (run.cancelRequested) {
+        store.stop(key, turnId);
+        return;
+      }
       const built = buildQuestion({
         item,
         question: text,
@@ -135,6 +148,7 @@ export class AskController {
   async #choosePaper(
     options: AskOptions,
     question: string,
+    run: Run,
   ): Promise<{ paperContext: 'none' | 'claude-decides' | 'forced'; pdfPath?: string; extractedText?: string }> {
     const paper = options.paper;
     const pdfPath = paper?.pdfPath;
@@ -150,7 +164,8 @@ export class AskController {
     if (mode !== 'forced') return { paperContext: 'none' };
     let text: string | undefined;
     try {
-      text = await paper.loadText();
+      // A load that never settles must not hold the run once Stop or Clear hits it.
+      text = await Promise.race([paper.loadText(), run.cancelSignal.then(() => undefined)]);
     } catch {
       text = undefined;
     }
@@ -212,6 +227,7 @@ export class AskController {
   #cancel(run: Run | undefined): void {
     if (!run || run.cancelRequested) return;
     run.cancelRequested = true;
+    run.signalCancel();
     run.runner?.cancel();
   }
 }
