@@ -1,15 +1,17 @@
 // Thread Store (pure, in-memory, never persisted). Behaviour lands in #4;
 // importExchange (Continue in Pane) in #10.
 import { notImplemented } from './not-implemented';
-import type { ErrorKind, ModelAlias, Thread, ThreadKey } from './types';
+import type { ErrorKind, ModelAlias, Thread, ThreadKey, Turn } from './types';
 
 export class ThreadStore {
   readonly #threads = new Map<ThreadKey, Thread>();
+  readonly #listeners = new Set<(key: ThreadKey) => void>();
+  #nextTurnId = 1;
 
-  /** The Thread for `key`; empty if nothing was asked yet. */
+  /** The Thread for `key`; empty if nothing was asked yet. Returns a deep copy. */
   get(key: ThreadKey): Thread {
-    void [this.#threads, key];
-    return notImplemented('ThreadStore.get', '#4');
+    const thread = this.#threads.get(key);
+    return thread ? structuredClone(thread) : { key, turns: [] };
   }
 
   /** Adds a streaming turn and returns its id. */
@@ -19,34 +21,46 @@ export class ThreadStore {
     model: ModelAlias,
     source: 'pane' | 'inline',
   ): string {
-    void [key, question, model, source];
-    return notImplemented('ThreadStore.appendQuestion', '#4');
+    let thread = this.#threads.get(key);
+    if (!thread) {
+      thread = { key, turns: [] };
+      this.#threads.set(key, thread);
+    }
+    const id = `turn-${this.#nextTurnId++}`;
+    thread.turns.push({ id, question, answer: '', model, status: 'streaming', source });
+    this.#notify(key);
+    return id;
   }
 
   appendDelta(key: ThreadKey, turnId: string, text: string): void {
-    void [key, turnId, text];
-    notImplemented('ThreadStore.appendDelta', '#4');
+    this.#update(key, turnId, (turn) => {
+      turn.answer += text;
+    });
   }
 
   finish(key: ThreadKey, turnId: string, sessionId: string): void {
-    void [key, turnId, sessionId];
-    notImplemented('ThreadStore.finish', '#4');
+    this.#update(key, turnId, (turn, thread) => {
+      turn.status = 'done';
+      thread.sessionId = sessionId;
+    });
   }
 
   /** Marks the turn stopped, keeping the partial Answer. */
   stop(key: ThreadKey, turnId: string): void {
-    void [key, turnId];
-    notImplemented('ThreadStore.stop', '#4');
+    this.#update(key, turnId, (turn) => {
+      turn.status = 'stopped';
+    });
   }
 
   fail(key: ThreadKey, turnId: string, kind: ErrorKind, message: string): void {
-    void [key, turnId, kind, message];
-    notImplemented('ThreadStore.fail', '#4');
+    this.#update(key, turnId, (turn) => {
+      turn.status = 'error';
+      turn.error = { kind, message };
+    });
   }
 
   clear(key: ThreadKey): void {
-    void key;
-    notImplemented('ThreadStore.clear', '#4');
+    if (this.#threads.delete(key)) this.#notify(key);
   }
 
   /** Continue in Pane: brings an inline exchange into the Thread. */
@@ -60,7 +74,22 @@ export class ThreadStore {
 
   /** Calls `listener` with the key of every Thread that changes. */
   subscribe(listener: (key: ThreadKey) => void): () => void {
-    void listener;
-    return notImplemented('ThreadStore.subscribe', '#4');
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
+  }
+
+  /** Applies `change` to the turn and notifies; unknown key or turn is a silent no-op. */
+  #update(key: ThreadKey, turnId: string, change: (turn: Turn, thread: Thread) => void): void {
+    const thread = this.#threads.get(key);
+    const turn = thread?.turns.find((t) => t.id === turnId);
+    if (!thread || !turn) return;
+    change(turn, thread);
+    this.#notify(key);
+  }
+
+  #notify(key: ThreadKey): void {
+    for (const listener of [...this.#listeners]) listener(key);
   }
 }
