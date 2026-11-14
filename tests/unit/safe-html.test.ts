@@ -83,19 +83,19 @@ describe('htmlToFragment', () => {
   });
 
   it('KaTeX output survives intact', () => {
-    const fragment = fragmentOf(renderAnswerHtml('$\alpha$'));
+    const fragment = fragmentOf(renderAnswerHtml('$\\alpha$'));
     expect(fragment.querySelectorAll('.katex').length).toBe(1);
   });
 
   it('keeps the KaTeX annotation text', () => {
-    const fragment = fragmentOf(renderAnswerHtml('$\alpha$'));
+    const fragment = fragmentOf(renderAnswerHtml('$\\alpha$'));
     expect(fragment.querySelector('annotation[encoding="application/x-tex"]')?.textContent).toBe(
-      '\alpha',
+      '\\alpha',
     );
   });
 
   describe('hostile Markdown end to end', () => {
-    const hostile = '<script>x</script> [a](javascript:x) $\href{javascript:x}{y}$';
+    const hostile = '<script>x</script> [a](javascript:x) $\\href{javascript:x}{y}$';
 
     it('has no script', () => {
       expect(fragmentOf(renderAnswerHtml(hostile)).querySelector('script')).toBeNull();
