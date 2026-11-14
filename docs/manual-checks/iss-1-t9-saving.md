@@ -1,3 +1,5 @@
+> Part of the consolidated checklist: [iss-1-manual-checklist.md](iss-1-manual-checklist.md). Run that for the full pass; this file holds the detailed steps it refers to.
+
 # Manual checks: Saved Notes and Saved Annotations (#9)
 
 Run against Zotero 10.0.x with the built `.scaffold/build/claude-for-zotero.xpi` installed, or through `npm start` (its own profile and data directory; see README). Use a test library, not one you care about. #11 folds this list into the full checklist.

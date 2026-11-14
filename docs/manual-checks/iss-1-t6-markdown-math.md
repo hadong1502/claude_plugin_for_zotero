@@ -1,3 +1,5 @@
+> Part of the consolidated checklist: [iss-1-manual-checklist.md](iss-1-manual-checklist.md). Run that for the full pass; this file holds the detailed steps it refers to.
+
 # Manual checks: Markdown and math in the Claude Pane (#6)
 
 Run against Zotero 10.0.x with the built `.scaffold/build/claude-for-zotero.xpi` installed, or through `npm start` (its own profile and data directory; see README). `npm run build` and `npm start` copy KaTeX's CSS, fonts and licence into `addon/content/katex/` first. #11 folds this list into the full checklist.
