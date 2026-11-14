@@ -30,6 +30,7 @@
     "@swc/core": "1.16.2"
   },
   "dependencies": {
+    "katex": "^0.16.47",
     "markdown-it": "^14.3.3"
   }
 }

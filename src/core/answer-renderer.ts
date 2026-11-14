@@ -2,6 +2,7 @@
 // text in #9.
 import MarkdownIt from 'markdown-it';
 
+import { markdownMath } from './markdown-math';
 import { notImplemented } from './not-implemented';
 import { isSafeLinkHref } from './safe-link';
 
@@ -15,6 +16,7 @@ const md = new MarkdownIt({
 });
 md.validateLink = isSafeLinkHref;
 md.disable('image');
+md.use(markdownMath);
 
 /** Markdown with LaTeX math to sanitised display HTML. */
 export function renderAnswerHtml(markdown: string): string {
