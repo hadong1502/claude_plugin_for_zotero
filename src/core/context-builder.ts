@@ -4,6 +4,9 @@
 import { notImplemented } from './not-implemented';
 import type { BuiltQuestion, QuestionInput } from './types';
 
+export const BASE_SYSTEM_PROMPT =
+  'You help a researcher read academic papers inside Zotero. Answer concisely in Markdown. Write math in LaTeX with $...$ for inline and $$...$$ for display.';
+
 export function buildQuestion(input: QuestionInput): BuiltQuestion {
   void input;
   return notImplemented('buildQuestion', '#4');
