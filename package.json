@@ -1,9 +1,19 @@
 {
   "name": "claude-for-zotero",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Claude for Zotero: ask Claude about papers in Zotero 10 through the local Claude Code CLI.",
   "private": true,
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hadong1502/claude_plugin_for_zotero.git"
+  },
+  "engines": {
+    "node": ">=22.8.0"
+  },
   "scripts": {
+    "build": "zotero-plugin build",
+    "start": "zotero-plugin serve",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -13,5 +23,8 @@
     "vitest": "^5.1.0",
     "zotero-plugin-scaffold": "^0.9.4",
     "zotero-types": "^4.1.3"
+  },
+  "overrides": {
+    "@swc/core": "1.16.2"
   }
 }
