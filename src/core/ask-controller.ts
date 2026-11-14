@@ -14,6 +14,7 @@ import type {
   ThreadKey,
 } from './types';
 
+/** Extra context for a question; the Inline Card passes `source: 'inline'` (#7). */
 export interface AskOptions {
   quickAction?: QuickAction;
   selection?: SelectionContext;
@@ -54,7 +55,7 @@ export class AskController {
     item: ItemContext,
     question: string,
     model: ModelAlias,
-    _options?: AskOptions,
+    options: AskOptions = {},
   ): Promise<void> {
     const text = question.trim();
     if (text === '' || this.#runs.has(key)) return;
@@ -64,10 +65,12 @@ export class AskController {
     this.#runs.set(key, run);
     const { store } = this.#deps;
     try {
-      const turnId = store.appendQuestion(key, text, model, 'pane');
+      const turnId = store.appendQuestion(key, text, model, options.source ?? 'pane');
       const built = buildQuestion({
         item,
         question: text,
+        quickAction: options.quickAction,
+        selection: options.selection,
         paperContext: 'none',
         ...this.#deps.settings(),
       });

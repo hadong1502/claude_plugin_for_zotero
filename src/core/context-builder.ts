@@ -1,6 +1,7 @@
 // Context Builder (pure): turns a question into prompt content and a
 // readable-file allowlist. Item Context, About me and language land in #4,
-// Quick Actions in #7, Paper Context modes and the Selection picture in #8.
+// Quick Actions and the Selection in #7, Paper Context modes and the Selection
+// picture in #8.
 import { notImplemented } from './not-implemented';
 import type { BuiltQuestion, QuestionInput, QuickAction } from './types';
 
@@ -15,8 +16,9 @@ export const QUICK_ACTION_WORDINGS: Readonly<Record<QuickAction, string>> = {
 };
 
 export function buildQuestion(input: QuestionInput): BuiltQuestion {
-  if (input.quickAction !== undefined) return notImplemented('buildQuestion quickAction', '#7');
-  if (input.selection !== undefined) return notImplemented('buildQuestion selection', '#7/#8');
+  if (input.selection?.imagePng !== undefined) {
+    throw new Error('buildQuestion: Selection picture lands in #8');
+  }
   if (input.priorExchange !== undefined) return notImplemented('buildQuestion priorExchange', '#10');
   if (input.paperContext !== 'none') throw new Error('buildQuestion: Paper Context lands in #8');
 
@@ -37,7 +39,21 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
   paper += '.';
   const lines = [paper];
   if (item.abstract) lines.push(`Abstract: ${item.abstract}`);
-  lines.push('', `Question: ${input.question.trim()}`);
+  const { selection } = input;
+  if (selection) {
+    const heading =
+      selection.pageLabel !== undefined && selection.pageLabel !== ''
+        ? `Selection (page ${selection.pageLabel}):`
+        : 'Selection:';
+    // The Selection's text goes in verbatim: not trimmed, not escaped.
+    lines.push('', heading, '"""', selection.text, '"""');
+  }
+  // A Quick Action's fixed wording replaces any typed text.
+  const question =
+    input.quickAction !== undefined
+      ? QUICK_ACTION_WORDINGS[input.quickAction]
+      : input.question.trim();
+  lines.push('', `Question: ${question}`);
 
   return {
     systemPrompt: parts.join('\n\n'),
