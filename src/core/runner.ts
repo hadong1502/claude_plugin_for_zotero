@@ -13,6 +13,7 @@ export class ClaudeRunner {
   readonly #port: ProcessPort;
   readonly #config: { cliPath: string; workdir: string };
   #running = false;
+  #deniedReads: string[] = [];
   #cancelled = false;
   #process: RunningProcess | undefined;
   #signalCancel: () => void = () => {};
@@ -27,9 +28,9 @@ export class ClaudeRunner {
     return this.#run(request);
   }
 
-  /** Paths of Reads denied in the last run (#8). */
+  /** Paths of Reads denied in the last run (#8); `[]` when none. */
   deniedReads(): string[] {
-    throw new Error('not implemented (#8)');
+    return this.#deniedReads;
   }
 
   /** Stops the running question, if any; its stream ends with `cancelled`. */
@@ -47,6 +48,7 @@ export class ClaudeRunner {
     }
     this.#running = true;
     this.#cancelled = false;
+    this.#deniedReads = [];
     const cancelSignal = new Promise<typeof CANCELLED>((resolve) => {
       this.#signalCancel = () => resolve(CANCELLED);
     });
@@ -111,6 +113,8 @@ export class ClaudeRunner {
             yield { type: 'delta', text: event.text };
           } else if (event.kind === 'assistant-error') {
             assistantErrorCode = event.code;
+          } else if (event.kind === 'read-denied') {
+            this.#deniedReads = event.paths;
           } else {
             result = event;
             break outer;

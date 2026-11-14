@@ -55,8 +55,16 @@ function parseLine(rawLine: string): ParsedEvent[] {
     }
     case 'assistant':
       return typeof event.error === 'string' ? [{ kind: 'assistant-error', code: event.error }] : [];
-    case 'result':
+    case 'result': {
+      // Denied Reads are reported just before the result (#8).
+      const paths: string[] = Array.isArray(event.permission_denials)
+        ? event.permission_denials.flatMap((d: any) =>
+            d?.tool_name === 'Read' && typeof d.tool_input?.file_path === 'string' ? [d.tool_input.file_path] : [],
+          )
+        : [];
+      const denied: ParsedEvent[] = paths.length > 0 ? [{ kind: 'read-denied', paths }] : [];
       return [
+        ...denied,
         {
           kind: 'result',
           isError: event.is_error === true,
@@ -65,6 +73,7 @@ function parseLine(rawLine: string): ParsedEvent[] {
           errors: Array.isArray(event.errors) ? event.errors.map(String) : [],
         },
       ];
+    }
     default:
       return [];
   }
