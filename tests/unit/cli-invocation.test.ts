@@ -60,7 +60,7 @@ describe('buildCliArgs', () => {
 });
 
 describe('buildStdinMessage', () => {
-  const TEXT = 'He said "x\y"\nthen $\alpha$ — λ';
+  const TEXT = 'He said "x\\y"\nthen $\\alpha$ — λ';
 
   it('stdin message round-trips quotes, backslashes, newlines and math', () => {
     const msg = buildStdinMessage([{ type: 'text', text: TEXT }]);
