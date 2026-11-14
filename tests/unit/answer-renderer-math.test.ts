@@ -128,4 +128,25 @@ describe('renderAnswerHtml math', () => {
     const doc = render('- item $x$');
     expect(doc.querySelector('li .katex')).not.toBeNull();
   });
+
+  it('half-arrived display closer stays literal', () => {
+    const doc = render('$$x^2$');
+    expect(doc.querySelector('.katex')).toBeNull();
+  });
+
+  it('display math is not split by a list marker inside it', () => {
+    const doc = render('$$\nf(x) = a\n+ b\n$$');
+    expect(doc.querySelectorAll('.katex-display')).toHaveLength(1);
+    expect(doc.querySelector(`.katex-display ${TEX}`)?.textContent?.trim()).toContain('+ b');
+  });
+
+  it('display math is not split by a blank line inside it', () => {
+    const doc = render('$$\na\n\nb\n$$');
+    expect(doc.querySelectorAll('.katex-display')).toHaveLength(1);
+  });
+
+  it('display math without a closing line stays literal', () => {
+    const doc = render('$$\nx');
+    expect(doc.querySelector('.katex')).toBeNull();
+  });
 });
