@@ -27,6 +27,7 @@ import { ensureCliWorkdir } from './cli-workdir';
 import { InlineCard, removeStyles, type CapturedSelection, type CardAnchor } from './inline-card';
 import { saveAnnotation, saveAnswerNote } from './library-writer';
 import { getPref } from './prefs';
+import { snapshotSelection } from './selection-snapshot';
 import { createSubprocessPort } from './subprocess-port';
 
 const BUTTON_CLASS = 'cfz-ask-claude';
@@ -147,6 +148,11 @@ function openCard(
   const selectionAnnotation = captureAnnotation(annotation);
   const anchor = createAnchor(reader, doc, annotation, button);
   const attachment = reader._item;
+  // Started once, here; every question of the card awaits it (#8).
+  const selectionSnapshot =
+    selection.pageIndex === undefined
+      ? Promise.resolve(undefined)
+      : snapshotSelection(reader, selection.pageIndex, selection.rects);
 
   // One card at a time: the old card closes and its run is cancelled.
   current.card?.close();
@@ -156,6 +162,7 @@ function openCard(
     controller: current.controller,
     defaultModel: () => getPref('defaultModel'),
     itemContext: () => itemContextOf(attachment),
+    selectionSnapshot,
     logError,
     openLink: (url) => Zotero.launchURL(url),
     onClose: (card) => {

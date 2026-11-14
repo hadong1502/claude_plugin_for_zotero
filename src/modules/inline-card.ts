@@ -72,6 +72,11 @@ export interface InlineCardDeps {
   defaultModel(): ModelAlias;
   /** The item's metadata, read when a question is asked. */
   itemContext(): ItemContext;
+  /**
+   * The Selection Snapshot (#8), started when the card opened: base64 PNG
+   * data, or undefined if it failed or timed out. It never rejects.
+   */
+  selectionSnapshot: Promise<string | undefined>;
   logError(e: unknown): void;
   /** Opens an allowed link (see isSafeLinkHref) in the system browser. */
   openLink(url: string): void;
@@ -108,6 +113,8 @@ export class InlineCard {
   readonly #disposers: Array<() => void> = [];
   #model: ModelAlias;
   #closed = false;
+  /** Counts questions, so one still waiting for the Selection Snapshot can tell it was replaced. */
+  #asks = 0;
   /** The turn last shown; a new turn resets the rendered Answer. */
   #turnId: string | null = null;
   #renderedAnswer: string | null = null;
@@ -307,12 +314,18 @@ export class InlineCard {
     }
     const { controller } = this.#deps;
     controller.clear(this.key);
+    const ask = ++this.#asks;
+    const model = this.#model;
     const { text, pageLabel } = this.selection;
-    controller
-      .ask(this.key, item, question, this.#model, {
-        source: 'inline',
-        quickAction,
-        selection: { text, pageLabel },
+    // The snapshot is usually ready by now; it resolves within its timeout
+    // either way, and without it the question goes text-only (#8).
+    this.#deps.selectionSnapshot
+      .catch(() => undefined)
+      .then((imagePng) => {
+        if (this.#closed || ask !== this.#asks) return;
+        const selection: SelectionContext =
+          imagePng === undefined ? { text, pageLabel } : { text, pageLabel, imagePng };
+        return controller.ask(this.key, item, question, model, { source: 'inline', quickAction, selection });
       })
       .catch((e: unknown) => this.#deps.logError(e));
   }
