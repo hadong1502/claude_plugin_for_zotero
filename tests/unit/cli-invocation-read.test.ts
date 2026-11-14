@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { buildCliArgs } from '../../src/core/cli-invocation';
 import type { ClaudeRequest } from '../../src/core/types';
 
-const FILE = 'C:\p\a.pdf';
-const WORKDIR = 'C:\d\w';
+const FILE = 'C:\\p\\a.pdf';
+const WORKDIR = 'C:\\d\\w';
 
 function request(overrides: Partial<ClaudeRequest> = {}): ClaudeRequest {
   return {
@@ -65,7 +65,7 @@ describe('buildCliArgs with a readable file', () => {
 
   it('two readable files throw', () => {
     expect(() =>
-      buildCliArgs(request({ readableFiles: [FILE, 'C:\p\b.pdf'] }), { workdir: WORKDIR }),
+      buildCliArgs(request({ readableFiles: [FILE, 'C:\\p\\b.pdf'] }), { workdir: WORKDIR }),
     ).toThrow('buildCliArgs: only one readable file is supported');
   });
 });
