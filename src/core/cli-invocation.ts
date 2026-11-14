@@ -3,7 +3,8 @@
 import type { ClaudeRequest, ContentBlock } from './types';
 
 /** Arguments of one CLI run. The question never goes here: it goes to stdin. */
-export function buildCliArgs(request: ClaudeRequest): string[] {
+export function buildCliArgs(request: ClaudeRequest, options?: { workdir?: string }): string[] {
+  void options;
   if (request.readableFiles.length > 0) {
     // #8 replaces this with the Read tool flags.
     throw new Error('buildCliArgs: readable files land in #8');
