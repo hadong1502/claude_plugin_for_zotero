@@ -1,8 +1,7 @@
 // Context Builder (pure): turns a question into prompt content and a
 // readable-file allowlist. Item Context, About me and language land in #4,
 // Quick Actions and the Selection in #7, Paper Context modes and the Selection
-// picture in #8.
-import { notImplemented } from './not-implemented';
+// picture in #8, the Continue in Pane prior exchange in #10.
 import type { BuiltQuestion, QuestionInput, QuickAction } from './types';
 
 export const BASE_SYSTEM_PROMPT =
@@ -19,7 +18,6 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
   if (input.selection?.imagePng !== undefined) {
     throw new Error('buildQuestion: Selection picture lands in #8');
   }
-  if (input.priorExchange !== undefined) return notImplemented('buildQuestion priorExchange', '#10');
   if (input.paperContext !== 'none') throw new Error('buildQuestion: Paper Context lands in #8');
 
   const parts = [BASE_SYSTEM_PROMPT];
@@ -39,6 +37,20 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
   paper += '.';
   const lines = [paper];
   if (item.abstract) lines.push(`Abstract: ${item.abstract}`);
+  const { priorExchange } = input;
+  if (priorExchange) {
+    // Continue in Pane into a non-empty Thread (#10): the inline exchange is
+    // quoted once as prior context; the Answer goes in verbatim.
+    lines.push(
+      '',
+      'Earlier in this conversation (from the reader):',
+      `Question: ${priorExchange.question.trim()}`,
+      'Answer:',
+      '"""',
+      priorExchange.answer,
+      '"""',
+    );
+  }
   const { selection } = input;
   if (selection) {
     const heading =

@@ -1,11 +1,12 @@
 // Thread Store (pure, in-memory, never persisted). Behaviour lands in #4;
-// importExchange (Continue in Pane) in #10.
-import { notImplemented } from './not-implemented';
+// importExchange (Continue in Pane) and its one-shot prior context in #10.
 import type { ErrorKind, ModelAlias, Thread, ThreadKey, Turn } from './types';
 
 export class ThreadStore {
   readonly #threads = new Map<ThreadKey, Thread>();
   readonly #listeners = new Set<(key: ThreadKey) => void>();
+  /** Continue in Pane exchanges held as one-shot prior context (#10). */
+  readonly #prior = new Map<ThreadKey, { question: string; answer: string }>();
   #nextTurnId = 1;
 
   /** The Thread for `key`; empty if nothing was asked yet. Returns a deep copy. */
@@ -60,22 +61,41 @@ export class ThreadStore {
   }
 
   clear(key: ThreadKey): void {
+    this.#prior.delete(key);
     if (this.#threads.delete(key)) this.#notify(key);
   }
 
-  /** Continue in Pane: brings an inline exchange into the Thread. */
+  /**
+   * Continue in Pane (#10): appends the inline exchange as a done turn. An
+   * empty Thread adopts the inline session id, so the next follow-up resumes
+   * that CLI session; otherwise (or with no session id) the exchange is held as
+   * prior context for the next question only.
+   */
   importExchange(
     key: ThreadKey,
     exchange: { question: string; answer: string; model: ModelAlias; sessionId?: string },
   ): void {
-    void [key, exchange];
-    notImplemented('ThreadStore.importExchange', '#10');
+    let thread = this.#threads.get(key);
+    if (!thread) {
+      thread = { key, turns: [] };
+      this.#threads.set(key, thread);
+    }
+    const { question, answer, model, sessionId } = exchange;
+    if (thread.turns.length === 0 && sessionId !== undefined) {
+      thread.sessionId = sessionId;
+    } else {
+      this.#prior.set(key, { question, answer });
+    }
+    const id = `turn-${this.#nextTurnId++}`;
+    thread.turns.push({ id, question, answer, model, status: 'done', source: 'inline' });
+    this.#notify(key);
   }
 
   /** Returns the held prior exchange for `key` and forgets it (#10). */
   takePriorExchange(key: ThreadKey): { question: string; answer: string } | undefined {
-    void key;
-    return notImplemented('ThreadStore.takePriorExchange', '#10');
+    const prior = this.#prior.get(key);
+    this.#prior.delete(key);
+    return prior;
   }
 
   /** Calls `listener` with the key of every Thread that changes. */

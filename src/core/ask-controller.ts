@@ -71,6 +71,8 @@ export class AskController {
         question: text,
         quickAction: options.quickAction,
         selection: options.selection,
+        // Continue in Pane (#10): a held inline exchange goes with this question only.
+        priorExchange: store.takePriorExchange(key),
         paperContext: 'none',
         ...this.#deps.settings(),
       });
