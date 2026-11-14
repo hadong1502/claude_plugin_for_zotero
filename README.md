@@ -55,13 +55,17 @@ dev instance does not attach to a Zotero that is already running.
 
 ## Layout
 
-- `addon/`: static plugin files (`bootstrap.js`, `manifest.json`, default `prefs.js`).
+- `addon/`: static plugin files (`bootstrap.js`, `manifest.json`, default `prefs.js`,
+  and the preferences pane markup `content/preferences.xhtml`).
 - `src/core/`: Zotero-free modules and shared types (Claude Runner, Process
-  Port, Context Builder, Thread Store, Answer Renderer, preference schema).
+  Port, Context Builder, Thread Store, Answer Renderer, preference schema,
+  CLI path resolution).
 - `src/modules/`: Zotero-dependent modules (Claude Pane, reader popup,
-  preferences pane, preference accessors).
+  preferences pane, preference accessors, CLI locator: `getCliPath()`).
 - `src/hooks.ts`: lifecycle; startup and shutdown call one registration
   function per feature.
+- `src/prefs-pane-entry.ts`: second bundle, `content/scripts/claudeforzotero-prefs.js`,
+  loaded by Zotero with the preferences pane.
 
 ## Known build quirk
 
