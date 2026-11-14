@@ -81,7 +81,7 @@ export class ThreadStore {
       this.#threads.set(key, thread);
     }
     const { question, answer, model, sessionId } = exchange;
-    if (thread.turns.length === 0 && sessionId !== undefined) {
+    if (thread.turns.length === 0 && sessionId) {
       thread.sessionId = sessionId;
     } else {
       this.#prior.set(key, { question, answer });
