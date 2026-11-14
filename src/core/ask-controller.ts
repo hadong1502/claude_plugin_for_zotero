@@ -9,8 +9,16 @@ import type {
   ClaudeRequest,
   ItemContext,
   ModelAlias,
+  QuickAction,
+  SelectionContext,
   ThreadKey,
 } from './types';
+
+export interface AskOptions {
+  quickAction?: QuickAction;
+  selection?: SelectionContext;
+  source?: 'pane' | 'inline';
+}
 
 export interface RunnerLike {
   ask(request: ClaudeRequest): AsyncIterable<AnswerEvent>;
@@ -41,7 +49,13 @@ export class AskController {
   }
 
   /** Resolves when the run ends. */
-  async ask(key: ThreadKey, item: ItemContext, question: string, model: ModelAlias): Promise<void> {
+  async ask(
+    key: ThreadKey,
+    item: ItemContext,
+    question: string,
+    model: ModelAlias,
+    _options?: AskOptions,
+  ): Promise<void> {
     const text = question.trim();
     if (text === '' || this.#runs.has(key)) return;
 

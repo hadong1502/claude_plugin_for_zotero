@@ -2,10 +2,17 @@
 // readable-file allowlist. Item Context, About me and language land in #4,
 // Quick Actions in #7, Paper Context modes and the Selection picture in #8.
 import { notImplemented } from './not-implemented';
-import type { BuiltQuestion, QuestionInput } from './types';
+import type { BuiltQuestion, QuestionInput, QuickAction } from './types';
 
 export const BASE_SYSTEM_PROMPT =
   'You help a researcher read academic papers inside Zotero. Answer concisely in Markdown. Write math in LaTeX with $...$ for inline and $$...$$ for display.';
+
+export const QUICK_ACTION_WORDINGS: Readonly<Record<QuickAction, string>> = {
+  explain: 'Explain this passage in plain language.',
+  define: 'Define this term or notation as it is used in this paper. Be brief.',
+  'explain-math':
+    'Explain the math in this passage. First restate the equation in LaTeX, then explain what each part means and how it follows.',
+};
 
 export function buildQuestion(input: QuestionInput): BuiltQuestion {
   if (input.quickAction !== undefined) return notImplemented('buildQuestion quickAction', '#7');
