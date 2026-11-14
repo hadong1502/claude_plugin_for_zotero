@@ -1,6 +1,5 @@
 // Item Context mapping (#4): a Zotero item to the identifying metadata sent
 // with every question. Pure: ItemLike stands in for a Zotero item.
-import { notImplemented } from './not-implemented';
 import type { ItemContext } from './types';
 
 export interface ItemLike {
@@ -9,6 +8,16 @@ export interface ItemLike {
 }
 
 export function itemContextFrom(item: ItemLike): ItemContext {
-  void item;
-  return notImplemented('itemContextFrom', '#4');
+  const creators = item
+    .getCreators()
+    .map((c) => c.name || `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim())
+    .filter((name) => name !== '');
+  const year = /\d{4}/.exec(item.getField('date'))?.[0];
+  const abstract = item.getField('abstractNote');
+  return {
+    title: item.getField('title'),
+    creators,
+    year,
+    abstract: abstract.trim() === '' ? undefined : abstract,
+  };
 }
