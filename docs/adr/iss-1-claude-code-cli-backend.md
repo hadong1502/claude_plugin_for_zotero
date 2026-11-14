@@ -20,6 +20,8 @@ claude.exe -p --input-format stream-json --output-format stream-json --verbose
 
 **Tool flags when no file is readable:** `--tools ""`.
 
+**Empty values on the command line:** Firefox's Subprocess on Windows drops an empty argument when it builds the command line, so `--setting-sources ""` would arrive as `--setting-sources --system-prompt`. The process adapter therefore sends each option with an empty value as `--setting-sources=` and `--tools=`, which the CLI parses as the same empty value (checked with CLI 2.1.322).
+
 **Tool flags when one file is readable (Paper Context):**
 
 ```
