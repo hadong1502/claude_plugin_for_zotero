@@ -1,13 +1,33 @@
 // CLI invocation builders (#4): the arguments, the stdin message and the child
 // environment of every Claude CLI run (#1 Implementation Decisions, Backend).
+import { readRulePath } from './paper-context';
 import type { ClaudeRequest, ContentBlock } from './types';
 
-/** Arguments of one CLI run. The question never goes here: it goes to stdin. */
+/**
+ * Arguments of one CLI run. The question never goes here: it goes to stdin.
+ * With one readable file the Read tool is scoped to exactly that PDF and the
+ * workdir is denied (#8, #1 ADR claude-code-cli-backend).
+ */
 export function buildCliArgs(request: ClaudeRequest, options?: { workdir?: string }): string[] {
-  void options;
-  if (request.readableFiles.length > 0) {
-    // #8 replaces this with the Read tool flags.
-    throw new Error('buildCliArgs: readable files land in #8');
+  const files = request.readableFiles;
+  if (files.length > 1) throw new Error('buildCliArgs: only one readable file is supported');
+  let toolFlags: string[] = ['--tools', ''];
+  if (files.length === 1) {
+    if (!options?.workdir) throw new Error('buildCliArgs: workdir is required with a readable file');
+    const settings = {
+      permissions: {
+        allow: [`Read(${readRulePath(files[0])})`],
+        deny: [`Read(${readRulePath(options.workdir)}/**)`],
+      },
+    };
+    toolFlags = [
+      '--tools',
+      'Read',
+      '--permission-mode',
+      'dontAsk',
+      '--settings',
+      JSON.stringify(settings),
+    ];
   }
   return [
     '-p',
@@ -25,8 +45,7 @@ export function buildCliArgs(request: ClaudeRequest, options?: { workdir?: strin
     '--model',
     request.model,
     ...(request.resumeSessionId ? ['--resume', request.resumeSessionId] : []),
-    '--tools',
-    '',
+    ...toolFlags,
   ];
 }
 

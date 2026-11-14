@@ -51,12 +51,6 @@ describe('buildCliArgs', () => {
     const args = buildCliArgs(request({ content: [{ type: 'text', text: 'QUESTION-MARKER' }] }));
     expect(args.some((a) => a.includes('QUESTION-MARKER'))).toBe(false);
   });
-
-  it('readable files are rejected until #8: throws', () => {
-    expect(() => buildCliArgs(request({ readableFiles: ['C:/p.pdf'] }))).toThrow(
-      'buildCliArgs: readable files land in #8',
-    );
-  });
 });
 
 describe('buildStdinMessage', () => {
