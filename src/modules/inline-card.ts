@@ -147,6 +147,10 @@ export class InlineCard {
     // Links in Answers never navigate the reader; allowed ones open in the
     // system browser.
     this.#body.addEventListener('click', (event) => this.#onLinkClick(event));
+    // A middle click would otherwise open the link from the reader document.
+    this.#body.addEventListener('auxclick', (event) => {
+      if (linkOf(event)) event.preventDefault();
+    });
 
     const inputRow = this.#el('div', 'cfz-card-input-row');
     this.#input = this.#el('input', 'cfz-card-input');
@@ -375,9 +379,7 @@ export class InlineCard {
 
   /** Links never navigate the reader; only allowed hrefs open, in the system browser. */
   #onLinkClick(event: MouseEvent): void {
-    const node = event.target as Node | null;
-    const start = node?.nodeType === 1 ? (node as Element) : node?.parentElement;
-    const link = start?.closest('a');
+    const link = linkOf(event);
     if (!link) return;
     event.preventDefault();
     const href = link.getAttribute('href') ?? '';
@@ -466,6 +468,13 @@ function ensureStyles(doc: Document): void {
 export function removeStyles(doc: Document): void {
   doc.getElementById(KATEX_LINK_ID)?.remove();
   doc.getElementById(STYLE_ID)?.remove();
+}
+
+/** The link an event happened in, if any. */
+function linkOf(event: Event): Element | null {
+  const node = event.target as Node | null;
+  const start = node?.nodeType === 1 ? (node as Element) : node?.parentElement;
+  return start?.closest('a') ?? null;
 }
 
 function setText(element: HTMLElement, text: string): void {
