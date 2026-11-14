@@ -7,8 +7,9 @@
 // Answer can be saved as a note or as an annotation on the Selection (#9),
 // only by pressing a button, or continued in the Claude Pane (#10), which
 // carries the question, its Answer and its session into the item's Thread and
-// closes the card.
-import type { AskController } from '../core/ask-controller';
+// closes the card. The card's "Use full paper" toggle (#8) starts unchecked
+// and goes with every question, Quick Actions included.
+import type { AskController, PaperSource } from '../core/ask-controller';
 import { renderAnswerHtml } from '../core/answer-renderer';
 import { placeCard, type Box, type CardSize } from '../core/card-placement';
 import { QUICK_ACTION_WORDINGS } from '../core/context-builder';
@@ -77,6 +78,8 @@ export interface InlineCardDeps {
    * data, or undefined if it failed or timed out. It never rejects.
    */
   selectionSnapshot: Promise<string | undefined>;
+  /** The item's PDF (#8), looked up when the card opened; undefined without one. It never rejects. */
+  paper: Promise<PaperSource | undefined>;
   logError(e: unknown): void;
   /** Opens an allowed link (see isSafeLinkHref) in the system browser. */
   openLink(url: string): void;
@@ -109,6 +112,7 @@ export class InlineCard {
   readonly #continue: HTMLButtonElement;
   readonly #input: HTMLInputElement;
   readonly #sendButton: HTMLButtonElement;
+  readonly #fullPaper: HTMLInputElement;
   readonly #modelButtons: Array<[ModelAlias, HTMLButtonElement]> = [];
   readonly #disposers: Array<() => void> = [];
   #model: ModelAlias;
@@ -230,6 +234,13 @@ export class InlineCard {
     }
     this.#renderModels();
 
+    this.#fullPaper = this.#el('input', 'cfz-card-full-paper');
+    this.#fullPaper.setAttribute('type', 'checkbox');
+    const fullPaperLabel = this.#el('label', 'cfz-card-full-paper-label');
+    fullPaperLabel.title = 'Send the whole paper with each question';
+    fullPaperLabel.append(this.#fullPaper, 'Use full paper');
+    models.append(fullPaperLabel);
+
     this.#root.append(header, actions, this.#body, inputRow, models);
     this.#root.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
@@ -316,16 +327,26 @@ export class InlineCard {
     controller.clear(this.key);
     const ask = ++this.#asks;
     const model = this.#model;
+    const useFullPaper = this.#fullPaper.checked;
     const { text, pageLabel } = this.selection;
-    // The snapshot is usually ready by now; it resolves within its timeout
-    // either way, and without it the question goes text-only (#8).
-    this.#deps.selectionSnapshot
-      .catch(() => undefined)
-      .then((imagePng) => {
+    // The snapshot and the PDF lookup are usually ready by now; the snapshot
+    // resolves within its timeout either way, and without it the question
+    // goes text-only (#8).
+    Promise.all([
+      this.#deps.selectionSnapshot.catch(() => undefined),
+      this.#deps.paper.catch(() => undefined),
+    ])
+      .then(([imagePng, paper]) => {
         if (this.#closed || ask !== this.#asks) return;
         const selection: SelectionContext =
           imagePng === undefined ? { text, pageLabel } : { text, pageLabel, imagePng };
-        return controller.ask(this.key, item, question, model, { source: 'inline', quickAction, selection });
+        return controller.ask(this.key, item, question, model, {
+          source: 'inline',
+          quickAction,
+          selection,
+          useFullPaper,
+          ...(paper ? { paper } : {}),
+        });
       })
       .catch((e: unknown) => this.#deps.logError(e));
   }

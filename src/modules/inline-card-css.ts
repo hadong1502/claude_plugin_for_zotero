@@ -128,8 +128,21 @@ export const INLINE_CARD_CSS = `
   border: 1px solid var(--fill-quinary, rgba(0, 0, 0, 0.2));
   background: var(--material-background, Field);
 }
+.cfz-card-models {
+  flex-wrap: wrap;
+}
 .cfz-card-models-label {
   color: var(--fill-secondary, GrayText);
+}
+.cfz-card-full-paper-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.cfz-card-full-paper {
+  margin: 0;
 }
 .cfz-card .cfz-card-model[aria-pressed="true"] {
   background: var(--accent-blue, Highlight);

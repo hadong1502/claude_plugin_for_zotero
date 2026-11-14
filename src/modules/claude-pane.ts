@@ -3,10 +3,12 @@
 // and one Ask Controller live as long as the plugin; every section instance
 // gets its own view (claude-pane-view.ts) over them. Continue in Pane (#10)
 // imports an Inline Card's exchange into this store and reveals the section
-// in the reader tab's context pane.
-import { AskController } from '../core/ask-controller';
+// in the reader tab's context pane. The item's PDF (#8) is looked up here for
+// the pane and the Inline Card alike.
+import { AskController, type PaperSource } from '../core/ask-controller';
 import type { ContinuedExchange } from '../core/continue-in-pane';
 import type { ItemLike } from '../core/item-context';
+import { findItemPdf, type ItemPdfLookup } from '../core/item-pdf';
 import { ClaudeRunner } from '../core/runner';
 import { ThreadStore } from '../core/thread-store';
 import type { Thread, ThreadKey, Turn } from '../core/types';
@@ -94,15 +96,15 @@ export function registerClaudePane(): void {
           views.set(body, new ClaudePaneView(body, viewDeps));
         });
       },
-      onItemChange: ({ body, item, setEnabled }) => {
+      onItemChange: ({ body, item, tabType, setEnabled }) => {
         guard(() => {
-          const target = paneTarget(item);
+          const target = paneTarget(item, readerTabID(body, tabType));
           setEnabled(target !== null);
           views.get(body)?.show(target);
         });
       },
-      onRender: ({ body, item }) => {
-        guard(() => views.get(body)?.show(paneTarget(item)));
+      onRender: ({ body, item, tabType }) => {
+        guard(() => views.get(body)?.show(paneTarget(item, readerTabID(body, tabType))));
       },
       onDestroy: ({ body }) => {
         guard(() => {
@@ -236,13 +238,81 @@ async function revealPane(paneID: string, tabID: string | undefined): Promise<vo
 /**
  * The Thread an item belongs to: a regular item's own, or for an attachment
  * its parent's (a standalone attachment has its own). Notes and other items
- * have none, and the section is disabled for them.
+ * have none, and the section is disabled for them. In a reader tab
+ * (`readerTab` set) the item's PDF is the reader's attachment.
  */
-function paneTarget(item: Zotero.Item | null | undefined): PaneTarget | null {
+function paneTarget(item: Zotero.Item | null | undefined, readerTab?: string): PaneTarget | null {
   if (!item || !(item.isRegularItem() || item.isAttachment())) return null;
   const key = item.isAttachment() && item.parentItemID ? item.parentItemID : item.id;
   const metadataItem = (key === item.id ? item : Zotero.Items.get(key)) || item;
-  return { key, item: itemLike(metadataItem) };
+  return {
+    key,
+    item: itemLike(metadataItem),
+    paper: () =>
+      itemPaper(
+        readerTab === undefined ? { selected: item } : { reader: Zotero.Reader.getByTabID(readerTab)?._item },
+      ),
+  };
+}
+
+/**
+ * The reader tab a section instance is in, or undefined in the library. In a
+ * reader tab the hooks get the parent item, and the tab's item pane is the
+ * section's `item-details`, whose `tabID` is the tab's (Zotero 10.0.8,
+ * elements/contextPane.js _addItemContext; elements/itemDetails.js render).
+ * An unknown tab ('') finds no reader, so the pane then has no PDF.
+ */
+function readerTabID(body: Element, tabType: string): string | undefined {
+  if (tabType !== 'reader') return undefined;
+  return (body.closest('item-details') as (Element & { tabID?: string }) | null)?.tabID ?? '';
+}
+
+/** Where the item's PDF is: a reader tab's attachment, or the item selected in the library. */
+export type PaperLocation = { reader: Zotero.Item | null | undefined } | { selected: Zotero.Item };
+
+/**
+ * The item's PDF (#8) as a Paper Source, or undefined when there is none.
+ * Its `pdfPath` is undefined when the file is missing. Never rejects.
+ */
+export async function itemPaper(where: PaperLocation): Promise<PaperSource | undefined> {
+  try {
+    const attachment = await findItemPdf(pdfLookup(where), isPdf);
+    if (!attachment) return undefined;
+    const path = await attachment.getFilePathAsync();
+    return {
+      pdfPath: path === false ? undefined : path,
+      // Extracted text; may be slow (PDFWorker), and Stop does not wait for it.
+      loadText: async () => {
+        try {
+          return await attachment.attachmentText;
+        } catch (e) {
+          logError(e);
+          return undefined;
+        }
+      },
+    };
+  } catch (e) {
+    logError(e);
+    return undefined;
+  }
+}
+
+function pdfLookup(where: PaperLocation): ItemPdfLookup<Zotero.Item> {
+  if ('reader' in where) return { reader: where.reader };
+  const item = where.selected;
+  const regular = item.isRegularItem()
+    ? item
+    : item.parentItemID
+      ? Zotero.Items.get(item.parentItemID)
+      : undefined;
+  return {
+    selected: item.isAttachment() ? item : undefined,
+    best: regular && regular.isRegularItem() ? () => regular.getBestAttachment() : undefined,
+  };
+}
+
+function isPdf(attachment: Zotero.Item): boolean {
+  return attachment.isAttachment() && attachment.attachmentContentType === 'application/pdf';
 }
 
 /** The item a Thread belongs to (its key is the item's ID), where Saved Notes go. */

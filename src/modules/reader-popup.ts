@@ -21,7 +21,7 @@ import type { SelectionAnnotation } from '../core/saving';
 import { ThreadStore } from '../core/thread-store';
 import type { ItemContext } from '../core/types';
 import { getPluginInfo } from '../plugin-info';
-import { continueInPane } from './claude-pane';
+import { continueInPane, itemPaper } from './claude-pane';
 import { getCliPath } from './cli-locator';
 import { ensureCliWorkdir } from './cli-workdir';
 import { InlineCard, removeStyles, type CapturedSelection, type CardAnchor } from './inline-card';
@@ -153,6 +153,8 @@ function openCard(
     selection.pageIndex === undefined
       ? Promise.resolve(undefined)
       : snapshotSelection(reader, selection.pageIndex, selection.rects);
+  // The item's PDF is the reader's attachment; looked up once, here (#8).
+  const paper = itemPaper({ reader: attachment });
 
   // One card at a time: the old card closes and its run is cancelled.
   current.card?.close();
@@ -163,6 +165,7 @@ function openCard(
     defaultModel: () => getPref('defaultModel'),
     itemContext: () => itemContextOf(attachment),
     selectionSnapshot,
+    paper,
     logError,
     openLink: (url) => Zotero.launchURL(url),
     onClose: (card) => {

@@ -3,8 +3,10 @@
 // elements in the section body and renders the shown Thread from the Thread
 // Store, so every view of one Thread stays in sync. Answers render as
 // Markdown with math (#6), inserted only as sanitised fragments. Answers and
-// the whole Thread can be saved as notes (#9), only by pressing a button.
-import type { AskController } from '../core/ask-controller';
+// the whole Thread can be saved as notes (#9), only by pressing a button. The
+// "Use full paper" toggle (#8) belongs to the view, starts unchecked and is
+// never saved.
+import type { AskController, PaperSource } from '../core/ask-controller';
 import { renderAnswerHtml } from '../core/answer-renderer';
 import { errorCopy } from '../core/failure';
 import { itemContextFrom, type ItemLike } from '../core/item-context';
@@ -27,6 +29,8 @@ const MODELS: ReadonlyArray<readonly [ModelAlias, string]> = [
 export interface PaneTarget {
   key: ThreadKey;
   item: ItemLike;
+  /** The item's PDF (#8), looked up at each question; undefined without one. Never rejects. */
+  paper(): Promise<PaperSource | undefined>;
 }
 
 export interface ClaudePaneViewDeps {
@@ -70,6 +74,7 @@ export class ClaudePaneView {
   readonly #thread: HTMLElement;
   readonly #input: HTMLTextAreaElement;
   readonly #modelPicker: MenuList;
+  readonly #fullPaper: HTMLInputElement;
   readonly #clearButton: HTMLButtonElement;
   readonly #saveThreadButton: SaveButton;
   readonly #sendButton: HTMLButtonElement;
@@ -77,6 +82,9 @@ export class ClaudePaneView {
   readonly #unsubscribe: () => void;
   #target: PaneTarget | null = null;
   #model: ModelAlias;
+  /** A question is waiting for the item's PDF lookup before it is asked. */
+  #sending = false;
+  #destroyed = false;
 
   constructor(body: HTMLElement, deps: ClaudePaneViewDeps) {
     this.#deps = deps;
@@ -106,6 +114,13 @@ export class ClaudePaneView {
 
     this.#modelPicker = this.#buildModelPicker();
 
+    this.#fullPaper = this.#html('input', 'claude-pane-full-paper');
+    this.#fullPaper.type = 'checkbox';
+    const fullPaperLabel = this.#html('label', 'claude-pane-full-paper-label');
+    fullPaperLabel.style.cssText = 'display: inline-flex; align-items: center; gap: 4px;';
+    fullPaperLabel.title = 'Send the whole paper with each question';
+    fullPaperLabel.append(this.#fullPaper, 'Use full paper');
+
     this.#clearButton = this.#html('button', 'claude-pane-clear');
     this.#clearButton.textContent = 'Clear';
     this.#clearButton.addEventListener('click', () => {
@@ -132,6 +147,7 @@ export class ClaudePaneView {
     controls.style.cssText = 'display: flex; flex-wrap: wrap; align-items: center; gap: 6px;';
     controls.append(
       this.#modelPicker,
+      fullPaperLabel,
       spacer,
       this.#saveThreadButton.element,
       this.#clearButton,
@@ -160,6 +176,7 @@ export class ClaudePaneView {
   }
 
   destroy(): void {
+    this.#destroyed = true;
     this.#unsubscribe();
     for (const turn of this.#turns.values()) this.#removeTurn(turn);
     this.#turns.clear();
@@ -170,12 +187,29 @@ export class ClaudePaneView {
 
   #send(): void {
     const target = this.#target;
-    if (!target || this.#isRunning()) return;
+    if (!target || this.#sending || this.#isRunning()) return;
     const question = this.#input.value;
     if (question.trim() === '') return;
+    const item = itemContextFrom(target.item);
     this.#input.value = '';
-    this.#deps.controller
-      .ask(target.key, itemContextFrom(target.item), question, this.#model)
+    const model = this.#model;
+    const useFullPaper = this.#fullPaper.checked;
+    this.#sending = true;
+    // The PDF is looked up per question, so a file added or removed since counts.
+    target
+      .paper()
+      .catch(() => undefined)
+      .then((paper) => {
+        this.#sending = false;
+        if (this.#destroyed) return;
+        return this.#deps.controller.ask(
+          target.key,
+          item,
+          question,
+          model,
+          paper ? { useFullPaper, paper } : { useFullPaper },
+        );
+      })
       .catch((e: unknown) => this.#deps.logError(e));
   }
 
@@ -216,6 +250,7 @@ export class ClaudePaneView {
     this.#clearButton.disabled = !enabled || turns.length === 0;
     this.#saveThreadButton.setEnabled(enabled && saveableTurns(turns).length > 0);
     this.#input.disabled = !enabled;
+    this.#fullPaper.disabled = !enabled;
   }
 
   /** Saves the shown Thread as it is at the press. */
