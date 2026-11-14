@@ -1,8 +1,11 @@
 // Claude Pane registration and wiring (#4): an item pane section, shown in the
 // library item pane and in each reader tab's context pane. One Thread Store
 // and one Ask Controller live as long as the plugin; every section instance
-// gets its own view (claude-pane-view.ts) over them.
+// gets its own view (claude-pane-view.ts) over them. Continue in Pane (#10)
+// imports an Inline Card's exchange into this store and reveals the section
+// in the reader tab's context pane.
 import { AskController } from '../core/ask-controller';
+import type { ContinuedExchange } from '../core/continue-in-pane';
 import type { ItemLike } from '../core/item-context';
 import { ClaudeRunner } from '../core/runner';
 import { ThreadStore } from '../core/thread-store';
@@ -39,8 +42,12 @@ const STYLESHEETS = [
 let styledWindows = new WeakSet<Window>();
 
 interface Registration {
-  /** Key returned by registerSection; false if it failed. */
+  /**
+   * Key returned by registerSection; false if it failed. Zotero namespaces the
+   * paneID with the plugin ID, and this key is the section's `data-pane`.
+   */
   sectionKey: string | false;
+  store: ThreadStore;
   controller: AskController;
   quitObserver: { observe(): void };
 }
@@ -115,7 +122,7 @@ export function registerClaudePane(): void {
       insertFluent(win);
       loadStylesheets(win);
     }
-    registration = { sectionKey, controller, quitObserver };
+    registration = { sectionKey, store, controller, quitObserver };
   } catch (e) {
     logError(e);
   }
@@ -137,6 +144,93 @@ export function unregisterClaudePane(): void {
     for (const win of Zotero.getMainWindows()) removeStylesheets(win);
   });
   styledWindows = new WeakSet<Window>();
+}
+
+/**
+ * Continue in Pane (#10): adds the exchange to the Thread of `item` (keyed as
+ * the pane keys it) and reveals the Claude Pane in the reader tab `tabID`.
+ * Returns whether the exchange was imported. Revealing runs after the import
+ * and its failures are only logged, so they never lose the import. A reader
+ * in its own window has no tab, and nothing is revealed.
+ */
+export function continueInPane(
+  item: Zotero.Item,
+  exchange: ContinuedExchange,
+  tabID?: string,
+): boolean {
+  const current = registration;
+  if (!current || current.sectionKey === false) {
+    logError(new Error('Continue in Pane: the Claude Pane is not registered'));
+    return false;
+  }
+  const target = paneTarget(item);
+  if (!target) {
+    logError(new Error(`Continue in Pane: item ${item.id} has no Thread`));
+    return false;
+  }
+  current.store.importExchange(target.key, exchange);
+  revealPane(current.sectionKey, tabID).catch(logError);
+  return true;
+}
+
+/** The reader tab's item pane, as far as revealing a section uses it. */
+interface ItemDetailsLike extends Element {
+  scrollToPane(paneID: string, behavior?: 'smooth' | 'instant'): Promise<unknown>;
+}
+
+interface SidenavLike {
+  container?: ItemDetailsLike | null;
+  /** True while the sidenav shows the notes pane; false selects the item pane. */
+  _contextNotesPaneVisible?: boolean;
+}
+
+interface MainWindowLike extends Window {
+  ZoteroContextPane?: { collapsed: boolean; sidenav?: SidenavLike | null };
+  Zotero_Tabs?: { selectedID?: string };
+}
+
+/**
+ * Opens the context pane, switches it from notes to the item pane, opens the
+ * section and scrolls to it, as a click on the section's sidenav button does
+ * (Zotero 10.0.8, chrome/content/zotero/elements/itemPaneSidenav.js
+ * handleButtonClick; contextPane.js; elements/itemPaneContainerBase.mjs
+ * scrollToPane).
+ */
+async function revealPane(paneID: string, tabID: string | undefined): Promise<void> {
+  if (!tabID) throw new Error('Continue in Pane: the reader is not in a tab; nothing to reveal');
+  const win = Zotero.getMainWindow() as MainWindowLike | null;
+  const contextPane = win?.ZoteroContextPane;
+  if (!win || !contextPane) throw new Error('Continue in Pane: no context pane to reveal');
+  const sidenav = contextPane.sidenav;
+  // contextPane.js gives each reader tab's item pane the id `${tabID}-context`;
+  // the sidenav's container is the selected tab's.
+  const details =
+    (win.document.getElementById(`${tabID}-context`) as ItemDetailsLike | null) ??
+    (win.Zotero_Tabs?.selectedID === tabID ? sidenav?.container : null);
+  if (typeof details?.scrollToPane !== 'function') {
+    throw new Error(`Continue in Pane: reader tab ${tabID} has no item pane`);
+  }
+
+  const section = details.querySelector(`collapsible-section[data-pane="${win.CSS.escape(paneID)}"]`) as
+    | (Element & { open?: boolean })
+    | null;
+  if (section && !section.open) section.open = true;
+
+  const collapsed = contextPane.collapsed;
+  // The getter reads false while the context pane is collapsed even if the
+  // notes pane is selected, so the item pane is selected unconditionally.
+  const notesShown = sidenav?._contextNotesPaneVisible === true;
+  if (sidenav && '_contextNotesPaneVisible' in sidenav) sidenav._contextNotesPaneVisible = false;
+  const behavior: 'smooth' | 'instant' = collapsed || notesShown ? 'instant' : 'smooth';
+  // While the context pane is collapsed, scrollToPane only records the pane,
+  // and expanding re-renders the item pane, which scrolls to it. Scrolling
+  // again after expanding covers an expand that does not re-render; it does
+  // nothing once the section is at the top.
+  await details.scrollToPane(paneID, behavior);
+  if (collapsed) {
+    contextPane.collapsed = false;
+    await details.scrollToPane(paneID, 'instant');
+  }
 }
 
 /**

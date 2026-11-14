@@ -109,6 +109,9 @@ export const INLINE_CARD_CSS = `
 .cfz-card-saves[hidden] {
   display: none;
 }
+.cfz-card .cfz-card-continue {
+  margin-left: auto;
+}
 .cfz-card-input-row,
 .cfz-card-models {
   display: flex;

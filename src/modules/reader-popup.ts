@@ -4,7 +4,8 @@
 // their own Thread Store and Ask Controller, never the Claude Pane's Thread.
 // Only one card exists at a time, across all reader tabs. The card's save
 // buttons (#9) write a note of the item, or a highlight on the Selection from
-// the popup's annotation as captured at the press.
+// the popup's annotation as captured at the press. Its Continue in Pane
+// button (#10) hands the exchange to the Claude Pane (claude-pane.ts).
 //
 // Reader internals used here (Zotero 10.0.8, resource://zotero/reader/reader.js):
 // the selection popup renders inside `.primary-view` or `.secondary-view` of
@@ -20,6 +21,7 @@ import type { SelectionAnnotation } from '../core/saving';
 import { ThreadStore } from '../core/thread-store';
 import type { ItemContext } from '../core/types';
 import { getPluginInfo } from '../plugin-info';
+import { continueInPane } from './claude-pane';
 import { getCliPath } from './cli-locator';
 import { ensureCliWorkdir } from './cli-workdir';
 import { InlineCard, removeStyles, type CapturedSelection, type CardAnchor } from './inline-card';
@@ -127,6 +129,8 @@ function onSelectionPopup(event: PopupEvent): void {
 
 interface ReaderLike {
   _item: Zotero.Item;
+  /** The reader's tab (xpcom/reader.js). */
+  tabID?: string;
   _internalReader?: InternalReaderLike;
 }
 
@@ -162,6 +166,7 @@ function openCard(
       if (!selectionAnnotation) throw new Error('Inline Card: the Selection was not captured');
       return saveAnnotation(attachment, selectionAnnotation, turn.question, turn.answer);
     },
+    continueInPane: (exchange) => continueInPane(attachment, exchange, reader.tabID),
   });
 }
 

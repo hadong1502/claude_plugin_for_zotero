@@ -5,11 +5,14 @@
 // session. Closing it (✕, Esc, a new card, the reader closing, shutdown)
 // cancels its run. Answers are inserted only as sanitised fragments. A done
 // Answer can be saved as a note or as an annotation on the Selection (#9),
-// only by pressing a button.
+// only by pressing a button, or continued in the Claude Pane (#10), which
+// carries the question, its Answer and its session into the item's Thread and
+// closes the card.
 import type { AskController } from '../core/ask-controller';
 import { renderAnswerHtml } from '../core/answer-renderer';
 import { placeCard, type Box, type CardSize } from '../core/card-placement';
 import { QUICK_ACTION_WORDINGS } from '../core/context-builder';
+import { continuedQuestion, type ContinuedExchange } from '../core/continue-in-pane';
 import { errorCopy } from '../core/failure';
 import { htmlToFragment } from '../core/safe-html';
 import { isSafeLinkHref } from '../core/safe-link';
@@ -78,6 +81,11 @@ export interface InlineCardDeps {
   saveNote(turn: Turn): Promise<unknown>;
   /** Saves the question and its Answer as a highlight on the Selection. */
   saveAnnotation(turn: Turn): Promise<unknown>;
+  /**
+   * Imports the exchange into the item's Thread and reveals the Claude Pane;
+   * returns whether it was imported (the card then closes).
+   */
+  continueInPane(exchange: ContinuedExchange): boolean;
 }
 
 export class InlineCard {
@@ -93,6 +101,7 @@ export class InlineCard {
   readonly #saves: HTMLElement;
   readonly #saveNote: SaveButton;
   readonly #saveAnnotation: SaveButton;
+  readonly #continue: HTMLButtonElement;
   readonly #input: HTMLInputElement;
   readonly #sendButton: HTMLButtonElement;
   readonly #modelButtons: Array<[ModelAlias, HTMLButtonElement]> = [];
@@ -165,9 +174,12 @@ export class InlineCard {
       () => this.#saveShown((turn) => this.#deps.saveAnnotation(turn)),
       deps.logError,
     );
+    this.#continue = this.#button('cfz-card-continue', 'Continue in Pane');
+    this.#continue.title = 'Keep discussing this in the Claude Pane';
+    this.#continue.addEventListener('click', () => this.#continueInPane());
     this.#saves = this.#el('div', 'cfz-card-saves');
     this.#saves.hidden = true;
-    this.#saves.append(this.#saveNote.element, this.#saveAnnotation.element);
+    this.#saves.append(this.#saveNote.element, this.#saveAnnotation.element, this.#continue);
     this.#body.append(this.#question, this.#answer, this.#status, this.#saves);
     // Links in Answers never navigate the reader; allowed ones open in the
     // system browser.
@@ -312,6 +324,27 @@ export class InlineCard {
       return Promise.reject(new Error('Inline Card: the Answer can no longer be saved'));
     }
     return save(turn);
+  }
+
+  /** Continues the shown done turn in the Claude Pane, then closes the card. */
+  #continueInPane(): void {
+    if (this.#closed) return;
+    const thread = this.#deps.store.get(this.key);
+    const turn = thread.turns.at(-1);
+    if (!turn || turn.id !== this.#turnId || turn.status !== 'done') return;
+    let imported = false;
+    try {
+      imported = this.#deps.continueInPane({
+        question: continuedQuestion(turn.question, this.selection.text),
+        answer: turn.answer,
+        model: turn.model,
+        sessionId: thread.sessionId,
+      });
+    } catch (e) {
+      this.#deps.logError(e);
+    }
+    // A failed import keeps the card, so its Answer is not lost.
+    if (imported) this.close();
   }
 
   #isRunning(): boolean {
