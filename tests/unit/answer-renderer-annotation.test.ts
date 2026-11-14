@@ -9,7 +9,7 @@ describe('toAnnotationText', () => {
   });
 
   it('LaTeX and Markdown are kept verbatim', () => {
-    const answer = '**b** $$\frac{a}{b}$$';
+    const answer = '**b** $$\\frac{a}{b}$$';
     expect(toAnnotationText('Q', answer)).toContain(answer);
   });
 });

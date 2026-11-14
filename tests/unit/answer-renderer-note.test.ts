@@ -29,7 +29,7 @@ describe('toNoteHtml', () => {
   });
 
   it("inline math uses Zotero's span format", () => {
-    expect(note('Let $\alpha$ be')).toContain('<span class="math">$\alpha$</span>');
+    expect(note('Let $\\alpha$ be')).toContain('<span class="math">$\\alpha$</span>');
   });
 
   it("display math uses Zotero's pre format", () => {
@@ -49,7 +49,7 @@ describe('toNoteHtml', () => {
 
   it('no KaTeX markup in notes', () => {
     const outputs = [
-      note('Let $\alpha$ be'),
+      note('Let $\\alpha$ be'),
       note('$$x^2$$'),
       note('$$\na = b\n$$'),
       note('$a<b$'),
