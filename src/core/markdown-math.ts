@@ -1,8 +1,49 @@
 import katex from 'katex';
 import type MarkdownIt from 'markdown-it';
 
-// Math plugin for Answers (#1, #6): inline $...$ and display $$...$$.
+// Math plugin for Answers (#1, #6): inline $...$ and display $$...$$. The
+// delimiter rules are shared; the renderer is KaTeX for display (#6) or
+// Zotero's note math markup for Saved Notes (#9).
 const DOLLAR = 0x24;
+
+/**
+ * Turns one formula's TeX into HTML. `displayMode` is true for `$$...$$`;
+ * `escapeHtml` is markdown-it's escaper, for renderers that emit the TeX as text.
+ */
+export type MathRenderer = (
+  tex: string,
+  displayMode: boolean,
+  escapeHtml: (text: string) => string,
+) => string;
+
+export interface MarkdownMathOptions {
+  /** How formulas become HTML; KaTeX typesetting (katexMath) by default. */
+  render?: MathRenderer;
+}
+
+/** Typesets a formula with KaTeX; a formula KaTeX cannot handle stays as code. */
+export const katexMath: MathRenderer = (tex, displayMode, escapeHtml) => {
+  try {
+    return katex.renderToString(tex, {
+      displayMode,
+      throwOnError: false,
+      trust: false,
+      strict: 'ignore',
+      output: 'htmlAndMathml',
+    });
+  } catch {
+    return `<code class="math-error">${escapeHtml(tex)}</code>`;
+  }
+};
+
+/**
+ * Zotero's note math format (#9), which its note editor renders: inline
+ * `<span class="math">$...$</span>` and display `<pre class="math">$$...$$</pre>`.
+ */
+export const zoteroNoteMath: MathRenderer = (tex, displayMode, escapeHtml) =>
+  displayMode
+    ? `<pre class="math">$$${escapeHtml(tex)}$$</pre>`
+    : `<span class="math">$${escapeHtml(tex)}$</span>`;
 
 function isSpace(ch: number): boolean {
   return ch === 0x20 || ch === 0x09 || ch === 0x0a || ch === 0x0d || ch === 0x0c || ch === 0x0b;
@@ -30,7 +71,7 @@ function findInlineClose(src: string, start: number, max: number): number {
   return -1;
 }
 
-export function markdownMath(md: MarkdownIt): void {
+export function markdownMath(md: MarkdownIt, options: MarkdownMathOptions = {}): void {
   // Block rule: a line starting with $$ opens display math that runs to the
   // first later line containing $$, so Markdown block markers (blank lines,
   // "- ", "> ", "#") inside the formula do not split it. Text after the
@@ -135,22 +176,10 @@ export function markdownMath(md: MarkdownIt): void {
     return true;
   });
 
-  const render = (displayMode: boolean) => (tokens: { content: string }[], idx: number): string => {
-    const tex = tokens[idx].content;
-    try {
-      return katex.renderToString(tex, {
-        displayMode,
-        throwOnError: false,
-        trust: false,
-        strict: 'ignore',
-        output: 'htmlAndMathml',
-      });
-    } catch {
-      return `<code class="math-error">${md.utils.escapeHtml(tex)}</code>`;
-    }
-  };
-  md.renderer.rules.math_inline = render(false);
-  md.renderer.rules.math_display = render(true);
-  const renderBlock = render(true);
-  md.renderer.rules.math_block = (tokens, idx) => renderBlock(tokens, idx) + '\n';
+  const render = options.render ?? katexMath;
+  const escapeHtml = md.utils.escapeHtml;
+  md.renderer.rules.math_inline = (tokens, idx) => render(tokens[idx].content, false, escapeHtml);
+  md.renderer.rules.math_display = (tokens, idx) => render(tokens[idx].content, true, escapeHtml);
+  md.renderer.rules.math_block = (tokens, idx) =>
+    render(tokens[idx].content, true, escapeHtml) + '\n';
 }

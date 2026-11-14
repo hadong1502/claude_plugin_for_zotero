@@ -2,21 +2,27 @@
 // text in #9.
 import MarkdownIt from 'markdown-it';
 
-import { markdownMath } from './markdown-math';
-import { notImplemented } from './not-implemented';
+import { markdownMath, zoteroNoteMath } from './markdown-math';
 import { isSafeLinkHref } from './safe-link';
 
-// Created once so later plugins (math, #6) extend the same instance.
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  typographer: false,
-  breaks: false,
-  xhtmlOut: true,
-});
-md.validateLink = isSafeLinkHref;
-md.disable('image');
-md.use(markdownMath);
+/** The Markdown rules every Answer is rendered with: raw HTML escaped, safe links only, no images. */
+function createMarkdown(): MarkdownIt {
+  const instance = new MarkdownIt({
+    html: false,
+    linkify: true,
+    typographer: false,
+    breaks: false,
+    xhtmlOut: true,
+  });
+  instance.validateLink = isSafeLinkHref;
+  instance.disable('image');
+  return instance;
+}
+
+// Created once each: display HTML typesets math with KaTeX (#6); note HTML
+// keeps the same Markdown and delimiter rules (#9).
+const md = createMarkdown().use(markdownMath);
+const noteMd = createMarkdown().use(markdownMath, { render: zoteroNoteMath });
 
 /** Markdown with LaTeX math to sanitised display HTML. */
 export function renderAnswerHtml(markdown: string): string {
@@ -25,12 +31,17 @@ export function renderAnswerHtml(markdown: string): string {
 
 /** Question and Answer pairs to Zotero note HTML, with math in Zotero's format. */
 export function toNoteHtml(turns: Array<{ question: string; answer: string }>): string {
-  void turns;
-  return notImplemented('toNoteHtml', '#9');
+  return turns
+    .map(({ question, answer }) => questionParagraph(question) + noteMd.render(answer))
+    .join('<hr/>');
 }
 
 /** A question and its Answer to plain annotation-comment text. */
 export function toAnnotationText(question: string, answer: string): string {
-  void [question, answer];
-  return notImplemented('toAnnotationText', '#9');
+  return `Q: ${question.trim()}\n\n${answer.trim()}`;
+}
+
+function questionParagraph(question: string): string {
+  const text = noteMd.utils.escapeHtml(question.trim()).replace(/\r?\n/g, '<br/>');
+  return `<p><strong>Question:</strong> ${text}</p>`;
 }
