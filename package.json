@@ -8,7 +8,10 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "typescript": "^7.0.2",
-    "vitest": "^5.1.0"
+    "vitest": "^5.1.0",
+    "zotero-plugin-scaffold": "^0.9.4",
+    "zotero-types": "^4.1.3"
   }
 }
