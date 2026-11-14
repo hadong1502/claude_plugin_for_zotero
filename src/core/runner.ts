@@ -27,6 +27,11 @@ export class ClaudeRunner {
     return this.#run(request);
   }
 
+  /** Paths of Reads denied in the last run (#8). */
+  deniedReads(): string[] {
+    throw new Error('not implemented (#8)');
+  }
+
   /** Stops the running question, if any; its stream ends with `cancelled`. */
   cancel(): void {
     if (!this.#running || this.#cancelled) return;

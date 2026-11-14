@@ -24,6 +24,8 @@ export interface AskOptions {
 export interface RunnerLike {
   ask(request: ClaudeRequest): AsyncIterable<AnswerEvent>;
   cancel(): void;
+  /** Paths of Reads denied in the last run (#8). */
+  deniedReads?(): string[];
 }
 
 export interface AskControllerDeps {

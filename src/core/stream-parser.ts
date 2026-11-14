@@ -5,6 +5,7 @@ export type ParsedEvent =
   | { kind: 'session'; sessionId: string }
   | { kind: 'text'; text: string }
   | { kind: 'assistant-error'; code: string }
+  | { kind: 'read-denied'; paths: string[] }
   | { kind: 'result'; isError: boolean; text: string; sessionId?: string; errors: string[] };
 
 export class StreamJsonParser {
