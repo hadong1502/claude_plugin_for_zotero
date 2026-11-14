@@ -2,7 +2,7 @@
 // readable-file allowlist. Item Context, About me and language land in #4,
 // Quick Actions and the Selection in #7, Paper Context modes and the Selection
 // picture in #8, the Continue in Pane prior exchange in #10.
-import type { BuiltQuestion, QuestionInput, QuickAction } from './types';
+import type { BuiltQuestion, ContentBlock, QuestionInput, QuickAction } from './types';
 
 export const BASE_SYSTEM_PROMPT =
   'You help a researcher read academic papers inside Zotero. Answer concisely in Markdown. Write math in LaTeX with $...$ for inline and $$...$$ for display.';
@@ -29,11 +29,6 @@ export const EXTRACTED_TEXT_LIMIT = 150000;
 export const SELECTION_PICTURE_NOTE = '(A picture of the selected region is attached.)';
 
 export function buildQuestion(input: QuestionInput): BuiltQuestion {
-  if (input.selection?.imagePng !== undefined) {
-    throw new Error('buildQuestion: Selection picture lands in #8');
-  }
-  if (input.paperContext !== 'none') throw new Error('buildQuestion: Paper Context lands in #8');
-
   const parts = [BASE_SYSTEM_PROMPT];
   const aboutMe = input.aboutMe.trim();
   if (aboutMe) parts.push(`About the reader: ${aboutMe}`);
@@ -44,6 +39,26 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
       : `Answer in ${language}.`,
   );
 
+  // Paper Context (#8): extracted text wins over the PDF; a mode with neither
+  // behaves as 'none'.
+  const { paperContext, pdfPath } = input;
+  const hasText = input.extractedText !== undefined && input.extractedText !== '';
+  let paperText: string | undefined;
+  let readableFiles: string[] = [];
+  if (paperContext !== 'none' && hasText) {
+    const full = input.extractedText as string;
+    paperText =
+      full.length > EXTRACTED_TEXT_LIMIT
+        ? `${full.slice(0, EXTRACTED_TEXT_LIMIT)}\n[…truncated]`
+        : full;
+    parts.push(PAPER_TEXT_INCLUDED);
+  } else if (paperContext !== 'none' && pdfPath !== undefined && pdfPath !== '') {
+    readableFiles = [pdfPath];
+    parts.push(
+      paperContext === 'forced' ? PAPER_READ_FIRST(pdfPath) : PAPER_READ_WHEN_NEEDED(pdfPath),
+    );
+  }
+
   const { item } = input;
   let paper = `Paper: "${item.title || 'Untitled'}"`;
   if (item.year) paper += ` (${item.year})`;
@@ -51,6 +66,9 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
   paper += '.';
   const lines = [paper];
   if (item.abstract) lines.push(`Abstract: ${item.abstract}`);
+  if (paperText !== undefined) {
+    lines.push('', 'Paper text (extracted from the PDF):', '"""', paperText, '"""');
+  }
   const { priorExchange } = input;
   if (priorExchange) {
     // Continue in Pane into a non-empty Thread (#10): the inline exchange is
@@ -73,6 +91,7 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
         : 'Selection:';
     // The Selection's text goes in verbatim: not trimmed, not escaped.
     lines.push('', heading, '"""', selection.text, '"""');
+    if (selection.imagePng !== undefined) lines.push(SELECTION_PICTURE_NOTE);
   }
   // A Quick Action's fixed wording replaces any typed text.
   const question =
@@ -81,9 +100,13 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
       : input.question.trim();
   lines.push('', `Question: ${question}`);
 
-  return {
-    systemPrompt: parts.join('\n\n'),
-    content: [{ type: 'text', text: lines.join('\n') }],
-    readableFiles: [],
-  };
+  const content: ContentBlock[] = [{ type: 'text', text: lines.join('\n') }];
+  if (selection?.imagePng !== undefined) {
+    content.push({
+      type: 'image',
+      mediaType: 'image/png',
+      data: selection.imagePng,
+    });
+  }
+  return { systemPrompt: parts.join('\n\n'), content, readableFiles };
 }

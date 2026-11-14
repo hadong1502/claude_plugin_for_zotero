@@ -94,12 +94,6 @@ describe('buildQuestion with a Quick Action or Selection', () => {
     expect(text.startsWith('Paper: "T".\nAbstract: A.\n\nSelection')).toBe(true);
   });
 
-  it('a Selection picture is rejected until #8', () => {
-    expect(() => buildQuestion(input({ selection: { text: 'x', imagePng: 'iVBOR' } }))).toThrow(
-      'buildQuestion: Selection picture lands in #8',
-    );
-  });
-
   it('system prompt is unchanged by Selection and Quick Action', () => {
     const plain = buildQuestion(input({ question: '' })).systemPrompt;
     const withBoth = buildQuestion(

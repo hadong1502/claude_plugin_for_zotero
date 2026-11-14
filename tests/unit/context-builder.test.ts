@@ -84,10 +84,4 @@ describe('buildQuestion', () => {
   it('no readable files for paperContext none', () => {
     expect(buildQuestion(input({ paperContext: 'none' })).readableFiles).toEqual([]);
   });
-
-  it('other Paper Context modes are rejected until #8', () => {
-    expect(() => buildQuestion(input({ paperContext: 'claude-decides' }))).toThrow(
-      'buildQuestion: Paper Context lands in #8',
-    );
-  });
 });
