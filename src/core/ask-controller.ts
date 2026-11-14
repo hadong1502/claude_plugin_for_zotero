@@ -70,8 +70,13 @@ export class AskController {
           store.fail(key, turnId, 'cli-not-found', '');
           return;
         }
+        if (run.cancelRequested) {
+          // Stopped before the runner existed: a runner ignores cancel() until
+          // its stream is read, so never start it.
+          store.stop(key, turnId);
+          return;
+        }
         run.runner = runner;
-        if (run.cancelRequested) runner.cancel();
 
         for await (const event of runner.ask(request)) {
           if (run.discarded) return;

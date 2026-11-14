@@ -363,3 +363,39 @@ describe('AskController', () => {
     expect(controller.isRunning(KEY)).toBe(false);
   });
 });
+
+describe('AskController stop before the runner exists', () => {
+  function setupDeferred() {
+    const store = new ThreadStore();
+    const runner = new ScriptedRunner(answer('A'));
+    let resolveRunner!: (r: RunnerLike) => void;
+    const controller = new AskController({
+      store,
+      createRunner: () => new Promise<RunnerLike>((r) => (resolveRunner = r)),
+      settings: () => SETTINGS,
+    });
+    return { store, controller, runner, resolveRunner: (r: RunnerLike) => resolveRunner(r) };
+  }
+
+  it('stop while the runner is being created ends the turn stopped without starting a run', async () => {
+    const { store, controller, runner, resolveRunner } = setupDeferred();
+    const run = controller.ask(KEY, ITEM, 'Q', 'sonnet');
+    controller.stop(KEY);
+    resolveRunner(runner);
+    await run;
+    expect([store.get(KEY).turns[0].status, runner.requests.length, controller.isRunning(KEY)]).toEqual([
+      'stopped',
+      0,
+      false,
+    ]);
+  });
+
+  it('cancelAll while the runner is being created ends the turn stopped without starting a run', async () => {
+    const { store, controller, runner, resolveRunner } = setupDeferred();
+    const run = controller.ask(KEY, ITEM, 'Q', 'sonnet');
+    controller.cancelAll();
+    resolveRunner(runner);
+    await run;
+    expect([store.get(KEY).turns[0].status, runner.requests.length]).toEqual(['stopped', 0]);
+  });
+});
