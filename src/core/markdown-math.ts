@@ -18,6 +18,11 @@ function findInlineClose(src: string, start: number, max: number): number {
       const before = src.charCodeAt(pos - 1);
       const after = pos + 1 < max ? src.charCodeAt(pos + 1) : NaN;
       const afterIsDigit = after >= 0x30 && after <= 0x39;
+      // A `$$` pair is a display delimiter, never an inline closer: skip it.
+      if (after === DOLLAR) {
+        pos += 2;
+        continue;
+      }
       if (pos > start && !isSpace(before) && !afterIsDigit) return pos;
     }
     pos++;
@@ -29,8 +34,10 @@ export function markdownMath(md: MarkdownIt): void {
   // Block rule: a line starting with $$ opens display math that runs to the
   // first later line containing $$, so Markdown block markers (blank lines,
   // "- ", "> ", "#") inside the formula do not split it. Text after the
-  // closing $$ on the closing line is dropped. Without a closing line the rule
-  // does not match and the paragraph/inline path keeps the text literal.
+  // closing $$ on a multi-line block becomes a following paragraph; with text
+  // after a same-line $$...$$ the rule does not match and the inline path
+  // handles the line. Without a closing line the rule does not match and the
+  // paragraph/inline path keeps the text literal.
   md.block.ruler.before(
     'paragraph',
     'math_block',
@@ -43,7 +50,9 @@ export function markdownMath(md: MarkdownIt): void {
       const parts: string[] = [];
       let closeLine = -1;
       const sameLine = rest.indexOf('$$');
+      let trailing = '';
       if (sameLine !== -1) {
+        if (rest.slice(sameLine + 2).trim() !== '') return false;
         parts.push(rest.slice(0, sameLine));
         closeLine = startLine;
       } else {
@@ -55,6 +64,7 @@ export function markdownMath(md: MarkdownIt): void {
           const idx = text.indexOf('$$');
           if (idx !== -1) {
             parts.push(text.slice(0, idx));
+            trailing = text.slice(idx + 2).trim();
             closeLine = line;
             break;
           }
@@ -71,6 +81,14 @@ export function markdownMath(md: MarkdownIt): void {
       token.markup = '$$';
       token.map = [startLine, closeLine + 1];
       state.line = closeLine + 1;
+      if (trailing !== '') {
+        state.push('paragraph_open', 'p', 1).map = [closeLine, closeLine + 1];
+        const inline = state.push('inline', '', 0);
+        inline.content = trailing;
+        inline.map = [closeLine, closeLine + 1];
+        inline.children = [];
+        state.push('paragraph_close', 'p', -1);
+      }
       return true;
     },
     { alt: ['paragraph', 'reference', 'blockquote', 'list'] },

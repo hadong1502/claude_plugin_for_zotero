@@ -149,4 +149,22 @@ describe('renderAnswerHtml math', () => {
     const doc = render('$$\nx');
     expect(doc.querySelector('.katex')).toBeNull();
   });
+
+  it('text after a same-line display is kept', () => {
+    const doc = render('$$a$$ and $$b$$');
+    expect(doc.querySelectorAll('.katex-display')).toHaveLength(2);
+    expect(doc.body.textContent).toContain('and');
+  });
+
+  it('text after a multi-line display closer is kept', () => {
+    const doc = render('$$\nx\n$$ where x is y');
+    expect(doc.querySelectorAll('.katex-display')).toHaveLength(1);
+    expect(doc.body.textContent).toContain('where x is y');
+  });
+
+  it('a half-streamed $$ does not close inline math', () => {
+    const doc = render('cost $5 and $$');
+    expect(doc.querySelector('.katex')).toBeNull();
+    expect(doc.querySelector('.katex-error')).toBeNull();
+  });
 });
