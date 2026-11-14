@@ -1,0 +1,48 @@
+<!--
+  Claude preferences pane (#5; #1 Preferences). Zotero parses this as a XUL
+  fragment (html: prefix for HTML tags), so there is no XML declaration.
+  Fields with a `preference` attribute are bound by Zotero itself. The Answer
+  language field and the CLI status line are wired by
+  content/scripts/claudeforzotero-prefs.js (src/prefs-pane-entry.ts), which
+  Zotero loads before this markup and which defines ClaudeForZoteroPrefs.
+-->
+<vbox id="zotero-prefpane-claude-for-zotero"
+      onload="event.waitUntil(window.ClaudeForZoteroPrefs.init(this))">
+  <groupbox>
+    <label><html:h2>Claude CLI</html:h2></label>
+    <label control="claude-for-zotero-cli-path" value="Path to the Claude CLI (leave empty to auto-detect):"/>
+    <html:input type="text" id="claude-for-zotero-cli-path"
+                preference="extensions.claude-for-zotero.cliPath"
+                placeholder="Auto-detect"/>
+    <description id="claude-for-zotero-cli-status">Looking for the Claude CLI...</description>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2>Answers</html:h2></label>
+    <hbox align="center">
+      <label control="claude-for-zotero-default-model" value="Default model:"/>
+      <menulist id="claude-for-zotero-default-model"
+                preference="extensions.claude-for-zotero.defaultModel">
+        <menupopup>
+          <menuitem label="Haiku" value="haiku"/>
+          <menuitem label="Sonnet" value="sonnet"/>
+          <menuitem label="Opus" value="opus"/>
+        </menupopup>
+      </menulist>
+    </hbox>
+    <hbox align="center">
+      <label control="claude-for-zotero-answer-language" value="Answer language:"/>
+      <html:input type="text" id="claude-for-zotero-answer-language"
+                  placeholder="Match the question"/>
+    </hbox>
+    <description>Leave the language empty to answer in the language of the question.</description>
+  </groupbox>
+
+  <groupbox>
+    <label><html:h2>About me</html:h2></label>
+    <description>Added to every question so Answers are pitched at your level.</description>
+    <html:textarea id="claude-for-zotero-about-me" rows="5"
+                   preference="extensions.claude-for-zotero.aboutMe"
+                   placeholder="e.g. PhD student in neuroscience; comfortable with statistics, new to fMRI."/>
+  </groupbox>
+</vbox>

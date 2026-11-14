@@ -36,6 +36,14 @@ export default defineConfig({
         target: 'firefox140',
         outfile: `.scaffold/build/addon/content/scripts/${addonRef}.js`,
       },
+      {
+        // Preferences pane script (#5), loaded by Zotero into the pane's scope.
+        entryPoints: ['src/prefs-pane-entry.ts'],
+        bundle: true,
+        format: 'iife',
+        target: 'firefox140',
+        outfile: `.scaffold/build/addon/content/scripts/${addonRef}-prefs.js`,
+      },
     ],
   },
   server: {
