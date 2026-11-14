@@ -40,7 +40,7 @@ describe('buildCliArgs', () => {
 
   it('args for a follow-up insert --resume <id> after --model <alias>', () => {
     const args = buildCliArgs(request({ resumeSessionId: 'abc' }));
-    expect(args.slice(-5)).toEqual(['--model', 'sonnet', '--resume', 'abc', '--tools', '']);
+    expect(args.slice(-6)).toEqual(['--model', 'sonnet', '--resume', 'abc', '--tools', '']);
   });
 
   it('args never contain --bare', () => {
