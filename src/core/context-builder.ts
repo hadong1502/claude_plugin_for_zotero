@@ -14,6 +14,20 @@ export const QUICK_ACTION_WORDINGS: Readonly<Record<QuickAction, string>> = {
     'Explain the math in this passage. First restate the equation in LaTeX, then explain what each part means and how it follows.',
 };
 
+// Paper Context prompt copy and limits (#8).
+export const PAPER_READ_WHEN_NEEDED = (pdfPath: string): string =>
+  `The paper's PDF is at ${pdfPath}. Read it with the Read tool only if the question needs the paper's content beyond what is given here.`;
+
+export const PAPER_READ_FIRST = (pdfPath: string): string =>
+  `The paper's PDF is at ${pdfPath}. Read it with the Read tool before answering, and base your Answer on it.`;
+
+export const PAPER_TEXT_INCLUDED =
+  "The paper's full text, extracted from its PDF, is included in the message. Base your Answer on it.";
+
+export const EXTRACTED_TEXT_LIMIT = 150000;
+
+export const SELECTION_PICTURE_NOTE = '(A picture of the selected region is attached.)';
+
 export function buildQuestion(input: QuestionInput): BuiltQuestion {
   if (input.selection?.imagePng !== undefined) {
     throw new Error('buildQuestion: Selection picture lands in #8');
