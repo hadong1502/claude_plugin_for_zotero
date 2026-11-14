@@ -129,7 +129,7 @@ export class ClaudePaneView {
     const spacer = this.#html('div');
     spacer.style.flex = '1';
     const controls = this.#html('div', 'claude-pane-controls');
-    controls.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+    controls.style.cssText = 'display: flex; flex-wrap: wrap; align-items: center; gap: 6px;';
     controls.append(
       this.#modelPicker,
       spacer,
