@@ -3,6 +3,7 @@
 // run's events stop being applied once it has ended or been cleared, so late
 // deltas never reach a cleared Thread (#4).
 import { buildQuestion } from './context-builder';
+import { canReadPdfPath, resolvePaperContext } from './paper-context';
 import type { ThreadStore } from './thread-store';
 import type {
   AnswerEvent,
@@ -55,6 +56,8 @@ interface Run {
 export class AskController {
   readonly #deps: AskControllerDeps;
   readonly #runs = new Map<ThreadKey, Run>();
+  /** PDF paths whose Read was denied at runtime, normalised; kept for the controller's lifetime (#8). */
+  readonly #deniedPdfs = new Set<string>();
 
   constructor(deps: AskControllerDeps) {
     this.#deps = deps;
@@ -77,6 +80,10 @@ export class AskController {
     const { store } = this.#deps;
     try {
       const turnId = store.appendQuestion(key, text, model, options.source ?? 'pane');
+      // Started before the paper is loaded so the runner is requested without delay.
+      const runnerReady = this.#deps.createRunner();
+      runnerReady.catch(() => {});
+      const paperInput = await this.#choosePaper(options, text);
       const built = buildQuestion({
         item,
         question: text,
@@ -84,7 +91,7 @@ export class AskController {
         selection: options.selection,
         // Continue in Pane (#10): a held inline exchange goes with this question only.
         priorExchange: store.takePriorExchange(key),
-        paperContext: 'none',
+        ...paperInput,
         ...this.#deps.settings(),
       });
       const request: ClaudeRequest = {
@@ -94,7 +101,7 @@ export class AskController {
       };
 
       try {
-        const runner = await this.#deps.createRunner();
+        const runner = await runnerReady;
         if (run.discarded) return;
         if (!runner) {
           store.fail(key, turnId, 'cli-not-found', '');
@@ -108,15 +115,54 @@ export class AskController {
         }
         run.runner = runner;
 
-        for await (const event of runner.ask(request)) {
-          if (run.discarded) return;
-          if (this.#apply(key, turnId, event)) return;
+        try {
+          for await (const event of runner.ask(request)) {
+            if (run.discarded) return;
+            if (this.#apply(key, turnId, event)) return;
+          }
+        } finally {
+          this.#rememberDenials(runner, request.readableFiles);
         }
       } catch (err) {
         if (!run.discarded) store.fail(key, turnId, 'failed', String(err));
       }
     } finally {
       if (this.#runs.get(key) === run) this.#runs.delete(key);
+    }
+  }
+
+  /** Picks the Paper Context for a run and what it needs from the paper (#8). */
+  async #choosePaper(
+    options: AskOptions,
+    question: string,
+  ): Promise<{ paperContext: 'none' | 'claude-decides' | 'forced'; pdfPath?: string; extractedText?: string }> {
+    const paper = options.paper;
+    const pdfPath = paper?.pdfPath;
+    const mode = resolvePaperContext({
+      useFullPaper: !!options.useFullPaper,
+      question,
+      hasPdf: pdfPath !== undefined,
+    });
+    if (mode === 'none' || !paper) return { paperContext: 'none' };
+    if (pdfPath !== undefined && canReadPdfPath(pdfPath) && !this.#deniedPdfs.has(normalisePath(pdfPath))) {
+      return { paperContext: mode, pdfPath };
+    }
+    if (mode !== 'forced') return { paperContext: 'none' };
+    let text: string | undefined;
+    try {
+      text = await paper.loadText();
+    } catch {
+      text = undefined;
+    }
+    return text?.trim() ? { paperContext: 'forced', extractedText: text } : { paperContext: 'none' };
+  }
+
+  #rememberDenials(runner: RunnerLike, readable: string[]): void {
+    if (readable.length === 0) return;
+    const denied = new Set((runner.deniedReads?.() ?? []).map(normalisePath));
+    for (const path of readable) {
+      const norm = normalisePath(path);
+      if (denied.has(norm)) this.#deniedPdfs.add(norm);
     }
   }
 
@@ -168,4 +214,8 @@ export class AskController {
     run.cancelRequested = true;
     run.runner?.cancel();
   }
+}
+
+function normalisePath(path: string): string {
+  return path.replace(/\\/g, '/').toLowerCase();
 }

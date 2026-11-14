@@ -1,8 +1,9 @@
 // Claude Runner: runs one question through the local Claude Code CLI and
-// yields the Answer as a stream of events (#4). The tool and permission flags
-// land in #8.
+// yields the Answer as a stream of events (#4). A readable file is scoped by
+// the CLI's Read flags (#8).
 import { buildCliArgs, buildStdinMessage } from './cli-invocation';
 import { classifyFailure } from './failure';
+import { canReadPdfPath } from './paper-context';
 import { ProcessNotFoundError, type ProcessPort, type RunningProcess } from './process-port';
 import { StreamJsonParser, type ParsedEvent } from './stream-parser';
 import type { AnswerEvent, ClaudeRequest } from './types';
@@ -61,7 +62,7 @@ export class ClaudeRunner {
         return;
       }
       try {
-        proc = await this.#port.spawn({ command: cliPath, args: buildCliArgs(request), workdir });
+        proc = await this.#port.spawn({ command: cliPath, args: buildCliArgs(forWorkdir(request, workdir), { workdir }), workdir });
       } catch (err) {
         if (err instanceof ProcessNotFoundError) {
           yield { type: 'error', kind: 'cli-not-found', message: cliPath };
@@ -202,6 +203,12 @@ export class ClaudeRunner {
       this.#process = undefined;
     }
   }
+}
+
+/** A workdir without a verified rule path can't scope Read: spawn without the file (#8). */
+function forWorkdir(request: ClaudeRequest, workdir: string): ClaudeRequest {
+  if (request.readableFiles.length === 0 || canReadPdfPath(workdir)) return request;
+  return { ...request, readableFiles: [] };
 }
 
 function describeError(err: unknown): string {
