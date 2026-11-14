@@ -24,6 +24,17 @@ const SIDENAV_L10N_ID = 'claude-for-zotero-pane-sidenav';
  * package bootstrap.js registers (addonRef in zotero-plugin.config.ts).
  */
 const ICONS = 'chrome://claudeforzotero/content/icons';
+/**
+ * Answer styles (#6), loaded into each main window as author sheets. KaTeX's
+ * CSS comes from the content-accessible package bootstrap.js registers, so
+ * the reader (#7) can use the same URL and fonts.
+ */
+const STYLESHEETS = [
+  'chrome://claudeforzotero-katex/content/katex.min.css',
+  'chrome://claudeforzotero/content/pane.css',
+];
+/** Windows the stylesheets are loaded into, so each is loaded once. */
+let styledWindows = new WeakSet<Window>();
 
 interface Registration {
   /** Key returned by registerSection; false if it failed. */
@@ -55,6 +66,7 @@ export function registerClaudePane(): void {
       controller,
       defaultModel: () => getPref('defaultModel'),
       logError,
+      openLink: (url: string) => Zotero.launchURL(url),
     };
 
     const sectionKey = Zotero.ItemPaneManager.registerSection({
@@ -65,6 +77,7 @@ export function registerClaudePane(): void {
       onInit: ({ body, doc }) => {
         guard(() => {
           insertFluent(doc.defaultView);
+          loadStylesheets(doc.defaultView);
           views.set(body, new ClaudePaneView(body, viewDeps));
         });
       },
@@ -92,7 +105,10 @@ export function registerClaudePane(): void {
     const quitObserver = { observe: () => guard(() => controller.cancelAll()) };
     Services.obs.addObserver(quitObserver, 'quit-application');
 
-    for (const win of Zotero.getMainWindows()) insertFluent(win);
+    for (const win of Zotero.getMainWindows()) {
+      insertFluent(win);
+      loadStylesheets(win);
+    }
     registration = { sectionKey, controller, quitObserver };
   } catch (e) {
     logError(e);
@@ -111,6 +127,10 @@ export function unregisterClaudePane(): void {
   guard(() => {
     for (const win of Zotero.getMainWindows()) removeFluent(win);
   });
+  guard(() => {
+    for (const win of Zotero.getMainWindows()) removeStylesheets(win);
+  });
+  styledWindows = new WeakSet<Window>();
 }
 
 /**
@@ -146,6 +166,28 @@ function removeFluent(win: Window): void {
   for (const link of win.document.querySelectorAll(`link[rel="localization"][href="${FTL_FILE}"]`)) {
     link.remove();
   }
+}
+
+/** Loads the Answer stylesheets into a main window once; never throws. */
+function loadStylesheets(win: Window | null | undefined): void {
+  if (!win || styledWindows.has(win)) return;
+  styledWindows.add(win);
+  for (const url of STYLESHEETS) {
+    guard(() => win.windowUtils.loadSheetUsingURIString(url, authorSheet(win)));
+  }
+}
+
+function removeStylesheets(win: Window): void {
+  if (!styledWindows.has(win)) return;
+  styledWindows.delete(win);
+  for (const url of STYLESHEETS) {
+    guard(() => win.windowUtils.removeSheetUsingURIString(url, authorSheet(win)));
+  }
+}
+
+/** nsIDOMWindowUtils.AUTHOR_SHEET; the Gecko typings mark the constant optional. */
+function authorSheet(win: Window): number {
+  return win.windowUtils.AUTHOR_SHEET ?? 2;
 }
 
 function guard(action: () => void): void {
