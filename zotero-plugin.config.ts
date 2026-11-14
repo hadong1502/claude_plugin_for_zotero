@@ -39,9 +39,12 @@ export default defineConfig({
     ],
   },
   server: {
-    // `npm start` must never touch the real Zotero profile or data directory:
-    // set ZOTERO_PLUGIN_PROFILE_PATH and ZOTERO_PLUGIN_DATA_DIR in .env (see
-    // README) to throwaway folders.
+    // `npm start` must never touch the real Zotero profile or data directory.
+    // Without ZOTERO_PLUGIN_PROFILE_PATH / ZOTERO_PLUGIN_DATA_DIR the scaffold
+    // uses .scaffold/profile and .scaffold/data (git-ignored); see README.
     devtools: false,
+    // Scaffold 0.9.4 passes "no-remote" without its dash, so pass it here to
+    // keep the dev instance from attaching to an already running Zotero.
+    startArgs: ['-no-remote'],
   },
 });
