@@ -14,11 +14,20 @@ import type {
   ThreadKey,
 } from './types';
 
+/** The paper behind the item: its PDF path and an extracted-text fallback (#8). */
+export interface PaperSource {
+  pdfPath?: string;
+  loadText(): Promise<string | undefined>;
+}
+
 /** Extra context for a question; the Inline Card passes `source: 'inline'` (#7). */
 export interface AskOptions {
   quickAction?: QuickAction;
   selection?: SelectionContext;
   source?: 'pane' | 'inline';
+  /** The Paper Context toggle: always read the full paper (#8). */
+  useFullPaper?: boolean;
+  paper?: PaperSource;
 }
 
 export interface RunnerLike {
