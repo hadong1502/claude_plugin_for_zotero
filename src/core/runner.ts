@@ -80,11 +80,18 @@ export class ClaudeRunner {
       let started = false;
       let assistantErrorCode: string | undefined;
       let result: Extract<ParsedEvent, { kind: 'result' }> | undefined;
+      let readError: unknown;
 
       const read = (): Promise<string | typeof CANCELLED> => Promise.race([proc!.readStdout(), cancelSignal]);
 
       outer: while (true) {
-        const chunk = await read();
+        let chunk: string | typeof CANCELLED;
+        try {
+          chunk = await read();
+        } catch (err) {
+          readError = err;
+          break;
+        }
         if (chunk === CANCELLED || this.#cancelled) break;
         const events = chunk === '' ? parser.end() : parser.push(chunk);
         for (const event of events) {
@@ -114,6 +121,13 @@ export class ClaudeRunner {
         return;
       }
 
+      if (readError !== undefined) {
+        finished = true;
+        proc.kill();
+        yield { type: 'error', kind: 'failed', message: describeError(readError) };
+        return;
+      }
+
       if (result && !result.isError) {
         finished = true;
         const text = deltas.length > 0 ? deltas.join('') : result.text;
@@ -127,22 +141,35 @@ export class ClaudeRunner {
       if (result) {
         // Drain the rest of stdout so the process can exit.
         while (true) {
-          const rest = await read();
+          let rest: string | typeof CANCELLED;
+          try {
+            rest = await read();
+          } catch {
+            break;
+          }
           if (rest === CANCELLED || rest === '') break;
         }
       }
       let stderr = '';
       const readStderrFully = async () => {
-        while (true) {
-          const part = await proc!.readStderr();
-          if (part === '') break;
-          stderr += part;
+        try {
+          while (true) {
+            const part = await proc!.readStderr();
+            if (part === '') break;
+            stderr += part;
+          }
+        } catch {
+          /* classify with the stderr read so far */
         }
       };
       const exit = await Promise.race([
         (async () => {
           await readStderrFully();
-          return proc!.wait();
+          try {
+            return await proc!.wait();
+          } catch {
+            return { exitCode: null };
+          }
         })(),
         cancelSignal,
       ]);
@@ -166,6 +193,11 @@ export class ClaudeRunner {
       this.#process = undefined;
     }
   }
+}
+
+function describeError(err: unknown): string {
+  const detail = err instanceof Error ? err.message : String(err);
+  return detail === '' ? 'Claude CLI process failed' : `Claude CLI process failed: ${detail}`;
 }
 
 /** Reads the process to its end in the background; never rejects. */

@@ -18,6 +18,10 @@ export interface FakePortOptions {
   notFound?: boolean;
   /** stdout stops after this many characters and stays pending until `kill()`, then ends. */
   hangAfterBytes?: number;
+  /** `readStdout` rejects with this message instead of returning data. */
+  readError?: string;
+  /** `wait()` rejects with this message. */
+  waitError?: string;
 }
 
 export interface FakePort {
@@ -73,7 +77,12 @@ export function fakePort(stdout: string, opts: FakePortOptions = {}): FakePort {
         async closeStdin() {
           stdinClosed = true;
         },
-        readStdout: reader(chunks(stdoutText, opts.chunkSize), hang, releaseEnded),
+        readStdout:
+          opts.readError !== undefined
+            ? async () => {
+                throw new Error(opts.readError);
+              }
+            : reader(chunks(stdoutText, opts.chunkSize), hang, releaseEnded),
         readStderr: reader(chunks(opts.stderr ?? '', opts.chunkSize), undefined, () => {}),
         kill() {
           killed = true;
@@ -81,6 +90,7 @@ export function fakePort(stdout: string, opts: FakePortOptions = {}): FakePort {
           releaseEnded();
         },
         async wait() {
+          if (opts.waitError !== undefined) throw new Error(opts.waitError);
           await ended;
           return { exitCode: opts.exitCode ?? 0 };
         },

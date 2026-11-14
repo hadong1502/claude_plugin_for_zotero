@@ -211,4 +211,18 @@ describe('ClaudeRunner', () => {
     const bytes = await collect(setup(raw, { chunkSize: 1 }).runner);
     expect(bytes).toEqual(whole);
   });
+
+  it('a rejecting stdout read yields one error failed and does not throw', async () => {
+    const { runner } = setup('', { readError: 'pipe broke' });
+    expect(await collect(runner)).toEqual([
+      { type: 'error', kind: 'failed', message: 'Claude CLI process failed: pipe broke' },
+    ]);
+  });
+
+  it('a rejecting wait() is classified with a null exit code', async () => {
+    const { runner } = setup('', { waitError: 'wait broke' });
+    expect(await collect(runner)).toEqual([
+      { type: 'error', kind: 'failed', message: 'Claude CLI exited with code null' },
+    ]);
+  });
 });
