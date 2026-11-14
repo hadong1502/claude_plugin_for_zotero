@@ -15,8 +15,12 @@ async function startup({ id, version, rootURI }, reason) {
     "@mozilla.org/addons/addon-manager-startup;1"
   ].getService(Components.interfaces.amIAddonManagerStartup);
   const manifestURI = Services.io.newURI(rootURI + "manifest.json");
+  // The second package holds KaTeX's CSS and fonts. Reader documents have a
+  // content principal and can load fonts only from a content-accessible
+  // package (#6).
   chromeHandle = aomStartup.registerChrome(manifestURI, [
     ["content", "__addonRef__", rootURI + "content/"],
+    ["content", "__addonRef__-katex", rootURI + "content/katex/", "contentaccessible=yes"],
   ]);
 
   // The bundle sets Zotero.__addonInstance__ = { hooks }.

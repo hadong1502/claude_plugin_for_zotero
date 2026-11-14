@@ -3,3 +3,5 @@ node_modules/
 .env
 # throwaway Zotero profile/data dir for npm start
 .zotero-dev/
+# KaTeX CSS, fonts and licence, copied by scripts/copy-katex-assets.mjs (prebuild/prestart)
+addon/content/katex/

@@ -19,7 +19,9 @@ export default defineConfig({
   updateURL:
     'https://raw.githubusercontent.com/hadong1502/claude_plugin_for_zotero/main/update.json',
   build: {
-    assets: ['addon/**/*.*'],
+    // `*.*` skips extension-less files, so KaTeX's LICENSE (copied by
+    // scripts/copy-katex-assets.mjs) is listed on its own.
+    assets: ['addon/**/*.*', 'addon/content/katex/LICENSE'],
     define: { addonName, addonID, addonRef, addonInstance },
     fluent: { dts: false },
     prefs: {

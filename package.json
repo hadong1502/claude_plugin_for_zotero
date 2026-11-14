@@ -12,7 +12,9 @@
     "node": ">=22.8.0"
   },
   "scripts": {
+    "prebuild": "node scripts/copy-katex-assets.mjs",
     "build": "zotero-plugin build",
+    "prestart": "node scripts/copy-katex-assets.mjs",
     "start": "zotero-plugin serve",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
