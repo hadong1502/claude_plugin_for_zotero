@@ -1,0 +1,90 @@
+/* Claude Pane Answers (#6): Markdown and KaTeX output, loaded into each main
+   window as an author sheet. Every rule is scoped under .claude-pane-answer so
+   nothing else in Zotero is affected. */
+
+.claude-pane-answer > :first-child {
+  margin-top: 0;
+}
+
+.claude-pane-answer > :last-child {
+  margin-bottom: 0;
+}
+
+.claude-pane-answer p {
+  margin: 0 0 0.6em;
+}
+
+.claude-pane-answer h1,
+.claude-pane-answer h2,
+.claude-pane-answer h3,
+.claude-pane-answer h4,
+.claude-pane-answer h5,
+.claude-pane-answer h6 {
+  margin: 0.8em 0 0.4em;
+  font-size: 1.05em;
+}
+
+.claude-pane-answer h1 {
+  font-size: 1.25em;
+}
+
+.claude-pane-answer h2 {
+  font-size: 1.15em;
+}
+
+.claude-pane-answer ul,
+.claude-pane-answer ol {
+  margin: 0 0 0.6em;
+  padding-inline-start: 1.5em;
+}
+
+.claude-pane-answer blockquote {
+  margin: 0 0 0.6em;
+  padding-inline-start: 0.8em;
+  border-inline-start: 3px solid var(--fill-quinary, rgba(0, 0, 0, 0.15));
+}
+
+.claude-pane-answer pre {
+  margin: 0 0 0.6em;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--material-mix-quinary, rgba(0, 0, 0, 0.05));
+  overflow-x: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.claude-pane-answer code {
+  font-family: monospace;
+  font-size: 0.95em;
+}
+
+.claude-pane-answer :not(pre) > code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--material-mix-quinary, rgba(0, 0, 0, 0.05));
+}
+
+.claude-pane-answer table {
+  margin: 0 0 0.6em;
+  border-collapse: collapse;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.claude-pane-answer th,
+.claude-pane-answer td {
+  padding: 3px 6px;
+  border: 1px solid var(--fill-quinary, rgba(0, 0, 0, 0.15));
+}
+
+.claude-pane-answer .katex-display {
+  margin: 0.5em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.claude-pane-answer code.math-error {
+  color: var(--accent-red, #d00);
+}

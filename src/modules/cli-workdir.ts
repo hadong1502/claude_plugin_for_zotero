@@ -1,0 +1,20 @@
+// The one fixed working directory of every Claude CLI run (#1 Implementation
+// Decisions, Backend): `<Zotero data dir>/claude-for-zotero/cli-workdir`. A
+// fixed directory keeps CLI sessions resumable. It must stay empty, because
+// the CLI lets Read open files inside its cwd without a rule, so the plugin
+// never writes into it.
+
+/**
+ * Where the paper's text files go (#11): `<Zotero data dir>/claude-for-zotero/
+ * paper-text`, a sibling of the working directory and never inside it.
+ */
+export function paperTextDir(): string {
+  return PathUtils.join(Zotero.DataDirectory.dir, 'claude-for-zotero', 'paper-text');
+}
+
+/** Creates the working directory if missing and returns its native path. */
+export async function ensureCliWorkdir(): Promise<string> {
+  const dir = PathUtils.join(Zotero.DataDirectory.dir, 'claude-for-zotero', 'cli-workdir');
+  await IOUtils.makeDirectory(dir, { createAncestors: true, ignoreExisting: true });
+  return dir;
+}
