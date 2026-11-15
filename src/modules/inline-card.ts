@@ -244,7 +244,7 @@ export class InlineCard {
     this.#fullPaper = this.#el('input', 'cfz-card-full-paper');
     this.#fullPaper.setAttribute('type', 'checkbox');
     const fullPaperLabel = this.#el('label', 'cfz-card-full-paper-label');
-    fullPaperLabel.title = 'Send the whole paper with each question';
+    fullPaperLabel.title = 'Have Claude read the full paper before answering';
     fullPaperLabel.append(this.#fullPaper, 'Use full paper');
     models.append(fullPaperLabel);
 

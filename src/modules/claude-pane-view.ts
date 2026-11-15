@@ -118,7 +118,7 @@ export class ClaudePaneView {
     this.#fullPaper.type = 'checkbox';
     const fullPaperLabel = this.#html('label', 'claude-pane-full-paper-label');
     fullPaperLabel.style.cssText = 'display: inline-flex; align-items: center; gap: 4px;';
-    fullPaperLabel.title = 'Send the whole paper with each question';
+    fullPaperLabel.title = 'Have Claude read the full paper before answering';
     fullPaperLabel.append(this.#fullPaper, 'Use full paper');
 
     this.#clearButton = this.#html('button', 'claude-pane-clear');
