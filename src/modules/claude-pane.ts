@@ -345,26 +345,35 @@ function removeFluent(win: Window): void {
   }
 }
 
-/** Loads the Answer stylesheets into a main window once; never throws. */
+/** Marks the plugin's <link> elements in a main window, so shutdown finds them. */
+const STYLESHEET_MARK = 'data-claudeforzotero-stylesheet';
+
+/**
+ * Loads the Answer stylesheets into a main window once, as <link> elements;
+ * never throws. Not windowUtils.loadSheetUsingURIString: in Zotero 10.0.8 it
+ * fails with NS_ERROR_FAILURE for the plugin's chrome:// sheets, which left
+ * Answers unstyled and KaTeX's 400em square-root graphic unclipped (#1, #11
+ * manual run).
+ */
 function loadStylesheets(win: Window | null | undefined): void {
   if (!win || styledWindows.has(win)) return;
   styledWindows.add(win);
+  const doc = win.document;
   for (const url of STYLESHEETS) {
-    guard(() => win.windowUtils.loadSheetUsingURIString(url, authorSheet(win)));
+    guard(() => {
+      const link = doc.createElement('link');
+      link.setAttribute(STYLESHEET_MARK, '');
+      link.rel = 'stylesheet';
+      link.href = url;
+      (doc.head ?? doc.documentElement).append(link);
+    });
   }
 }
 
 function removeStylesheets(win: Window): void {
   if (!styledWindows.has(win)) return;
   styledWindows.delete(win);
-  for (const url of STYLESHEETS) {
-    guard(() => win.windowUtils.removeSheetUsingURIString(url, authorSheet(win)));
-  }
-}
-
-/** nsIDOMWindowUtils.AUTHOR_SHEET; the Gecko typings mark the constant optional. */
-function authorSheet(win: Window): number {
-  return win.windowUtils.AUTHOR_SHEET ?? 2;
+  for (const link of win.document.querySelectorAll(`link[${STYLESHEET_MARK}]`)) link.remove();
 }
 
 function guard(action: () => void): void {

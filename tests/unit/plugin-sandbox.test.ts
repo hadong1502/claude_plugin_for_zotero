@@ -65,4 +65,14 @@ describe("Zotero's plugin sandbox", () => {
   it.each(MISSING_IN_SANDBOX)('src never calls the window-only global %s', (name) => {
     expect(bareUses(name)).toEqual([]);
   });
+
+  // Zotero 10.0.8 refuses chrome:// sheets through windowUtils with
+  // NS_ERROR_FAILURE, which left Claude Pane Answers unstyled; stylesheets are
+  // added as <link> elements instead.
+  it('src never loads stylesheets through windowUtils', () => {
+    const uses = sourceFiles(join(__dirname, '../../src')).filter((file) =>
+      /\.(load|remove)SheetUsingURIString\s*\(/.test(readFileSync(file, 'utf8')),
+    );
+    expect(uses).toEqual([]);
+  });
 });
