@@ -3,6 +3,7 @@
 // xpcom/preferencePanes.js); unregistering here as well keeps shutdown
 // self-contained and lets a re-enable register the same pane ID again.
 import { getPluginInfo } from '../plugin-info';
+import { logError } from './errors';
 
 /** Stable pane ID, e.g. for Zotero.Utilities.Internal.openPreferences(PANE_ID). */
 export const PANE_ID = 'claude-for-zotero';
@@ -21,7 +22,7 @@ export async function registerPrefsPane(): Promise<void> {
     });
   } catch (e) {
     // A missing pane must not stop the rest of the plugin.
-    Zotero.logError(e instanceof Error ? e : new Error(String(e)));
+    logError(e);
   }
 }
 

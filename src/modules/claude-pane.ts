@@ -16,6 +16,7 @@ import { getPluginInfo } from '../plugin-info';
 import { ClaudePaneView, type PaneTarget } from './claude-pane-view';
 import { getCliPath } from './cli-locator';
 import { ensureCliWorkdir, paperTextDir } from './cli-workdir';
+import { guard, logError } from './errors';
 import { saveAnswerNote, saveThreadNote } from './library-writer';
 import { getPref } from './prefs';
 import { createSubprocessPort } from './subprocess-port';
@@ -395,16 +396,4 @@ function removeStylesheets(win: Window): void {
   if (!styledWindows.has(win)) return;
   styledWindows.delete(win);
   for (const link of win.document.querySelectorAll(`link[${STYLESHEET_MARK}]`)) link.remove();
-}
-
-function guard(action: () => void): void {
-  try {
-    action();
-  } catch (e) {
-    logError(e);
-  }
-}
-
-function logError(e: unknown): void {
-  Zotero.logError(e instanceof Error ? e : new Error(String(e)));
 }

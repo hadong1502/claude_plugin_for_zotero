@@ -11,6 +11,7 @@
 // (xpcom/reader.js reaches pdf.js the same way). pdf.js is content code: every
 // object it reads must be created in its window, never passed from the plugin.
 import { selectionCropBox } from '../core/selection-crop';
+import { logError } from './errors';
 
 const DEFAULT_TIMEOUT_MS = 3000;
 const PNG_PREFIX = 'data:image/png;base64,';
@@ -140,8 +141,4 @@ async function render(
 function toContent<T extends object>(win: PdfWindowLike, values: T): T {
   const target = Components.utils.waiveXrays(Components.utils.cloneInto({}, win)) as T;
   return Object.assign(target, values);
-}
-
-function logError(e: unknown): void {
-  Zotero.logError(e instanceof Error ? e : new Error(String(e)));
 }

@@ -24,6 +24,7 @@ import { getPluginInfo } from '../plugin-info';
 import { continueInPane, itemPaper } from './claude-pane';
 import { getCliPath } from './cli-locator';
 import { ensureCliWorkdir } from './cli-workdir';
+import { guard, logError } from './errors';
 import { InlineCard, removeStyles, type CapturedSelection, type CardAnchor } from './inline-card';
 import { saveAnnotation, saveAnswerNote } from './library-writer';
 import { getPref } from './prefs';
@@ -357,16 +358,4 @@ function readerDocuments(): Document[] {
     }
   }
   return docs;
-}
-
-function guard(action: () => void): void {
-  try {
-    action();
-  } catch (e) {
-    logError(e);
-  }
-}
-
-function logError(e: unknown): void {
-  Zotero.logError(e instanceof Error ? e : new Error(String(e)));
 }

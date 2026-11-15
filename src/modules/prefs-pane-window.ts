@@ -5,6 +5,7 @@
 // shown as an empty field) and the auto-detected CLI path.
 import { answerLanguageFromField, answerLanguageToField, cliPathStatus } from '../core/prefs-pane-text';
 import { detectCliPathInZotero } from './cli-locator';
+import { logError } from './errors';
 import { getPref, setPref } from './prefs';
 
 export function initPrefsPane(root: Element): Promise<void> {
@@ -34,7 +35,7 @@ export function initPrefsPane(root: Element): Promise<void> {
   // Detect in the background so the pane shows at once.
   detectCliPathInZotero()
     .catch((e: unknown) => {
-      Zotero.logError(e instanceof Error ? e : new Error(String(e)));
+      logError(e);
       return null;
     })
     .then((path) => {
