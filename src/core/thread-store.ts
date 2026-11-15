@@ -1,5 +1,6 @@
-// Thread Store (pure, in-memory, never persisted). Behaviour lands in #4;
-// importExchange (Continue in Pane) and its one-shot prior context in #10.
+// Thread Store (pure, in-memory, never persisted): one Thread of Turns per
+// ThreadKey, with change notifications for the views. importExchange carries a
+// Continue in Pane exchange over as one-shot prior context for the next question.
 import type { ErrorKind, ModelAlias, Thread, ThreadKey, Turn } from './types';
 
 export class ThreadStore {

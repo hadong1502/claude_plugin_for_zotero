@@ -1,5 +1,5 @@
-// Answer Renderer (pure). Display HTML lands in #6; note HTML and annotation
-// text in #9.
+// Answer Renderer (pure): turns an Answer's Markdown and math into display
+// HTML, into Zotero note HTML, and into plain annotation text.
 import MarkdownIt from 'markdown-it';
 
 import { markdownMath, zoteroNoteMath } from './markdown-math';

@@ -1,5 +1,6 @@
-// Plugin lifecycle, called from addon/bootstrap.js. Each feature has exactly
-// one registration call here, so later tickets fill only their own module.
+// Plugin lifecycle, called from addon/bootstrap.js. Each feature (Claude Pane,
+// reader popup, preferences pane) has one register call at startup and one
+// unregister call at shutdown; the features themselves live in src/modules.
 import { registerClaudePane, unregisterClaudePane } from './modules/claude-pane';
 import { registerPrefsPane, unregisterPrefsPane } from './modules/prefs-pane';
 import { registerReaderPopup, unregisterReaderPopup } from './modules/reader-popup';
