@@ -32,7 +32,9 @@ export function renderAnswerHtml(markdown: string): string {
 /** Question and Answer pairs to Zotero note HTML, with math in Zotero's format. */
 export function toNoteHtml(turns: Array<{ question: string; answer: string }>): string {
   return turns
-    .map(({ question, answer }) => questionParagraph(question) + noteMd.render(answer))
+    // The line break keeps the question and the Answer apart in Zotero's note
+    // preview, which splits the stored HTML on line breaks.
+    .map(({ question, answer }) => `${questionHeading(question)}\n${noteMd.render(answer)}`)
     .join('<hr/>');
 }
 
@@ -41,7 +43,8 @@ export function toAnnotationText(question: string, answer: string): string {
   return `Q: ${question.trim()}\n\n${answer.trim()}`;
 }
 
-function questionParagraph(question: string): string {
+function questionHeading(question: string): string {
   const text = noteMd.utils.escapeHtml(question.trim()).replace(/\r?\n/g, '<br/>');
-  return `<p><strong>Question:</strong> ${text}</p>`;
+  // A gray, left-aligned Heading 1, so each question reads as a section title in the note.
+  return `<h1 style="text-align: left"><span style="color: #808080">Question: ${text}</span></h1>`;
 }
