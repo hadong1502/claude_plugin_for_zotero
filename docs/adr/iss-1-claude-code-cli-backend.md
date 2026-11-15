@@ -37,6 +37,10 @@ claude.exe -p --input-format stream-json --output-format stream-json --verbose
   - Unverified: other characters, non-ASCII names, other drives and UNC paths.
   - If `result.permission_denials` lists the allowed file itself, the rule failed to match, and the plugin falls back to extracted text.
 
+**Two readable files (#11 manual run, amending #8):** Paper Context allows up to two Read rules, one per file: the paper's text file (the attachment's extracted text, written by the plugin to `<Zotero data dir>/claude-for-zotero/paper-text/<attachment key>.txt`) and the PDF. The `allow` list has one rule per readable file; the `deny` rule on the working directory is unchanged.
+- Why: for PDFs over 10 pages the CLI's Read needs page ranges, which it renders with `pdftoppm -jpeg` from PATH. Without poppler it fails (`pdftoppm is not installed`), and with TeX Live's `pdftoppm`, which has no JPEG support, CLI 2.1.325 misreports the failure as "PDF is password-protected". Text files need no external tool, so the text file makes Paper Context work on any machine, and the PDF stays readable for equations, figures and tables wherever poppler works.
+- Rejected: text file only (loses typeset equations and figures where poppler works); PDF only with a documented poppler requirement (most Windows users have none, and TeX Live users get a misleading error).
+
 **Prompt delivery:** stdin, never arguments. One stream-json line, then stdin is closed:
 
 ```json
