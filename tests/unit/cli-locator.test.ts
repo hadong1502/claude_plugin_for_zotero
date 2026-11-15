@@ -111,3 +111,31 @@ describe('CLI locator (src/modules/cli-locator)', () => {
     expect(await detectCliPathInZotero()).toBe(win('C:/bin/claude.exe'));
   });
 });
+
+// Only a .exe is spawned on Windows (#1, final review): a .cmd or .bat runs
+// through cmd.exe, which can turn a `&` in a PDF file name into a command.
+describe('CLI locator, .exe only on Windows (src/modules/cli-locator)', () => {
+  it('getCliPath returns null for a .cmd override on Windows, so the question fails with cli-not-found', async () => {
+    const { pathSearchSpy } = stubGecko({
+      override: win('C:/Users/u/AppData/Roaming/npm/claude.cmd'),
+      pathSearch: async () => win('C:/bin/claude.exe'),
+    });
+    expect(await getCliPath()).toBeNull();
+    expect(pathSearchSpy).not.toHaveBeenCalled();
+  });
+
+  it('getCliPath keeps a non-.exe override outside Windows', async () => {
+    stubGecko({ isWin: false, home: '/home/u', override: '/usr/local/bin/claude' });
+    expect(await getCliPath()).toBe('/usr/local/bin/claude');
+  });
+
+  it('auto-detection skips an npm shim on PATH and finds claude.exe', async () => {
+    const shims: Record<string, string> = {
+      claude: win('C:/Users/u/AppData/Roaming/npm/claude'),
+      'claude.exe': win('C:/Users/u/.local/bin/claude.exe'),
+    };
+    const { pathSearchSpy } = stubGecko({ pathSearch: async (name) => shims[name] });
+    expect(await detectCliPathInZotero()).toBe(win('C:/Users/u/.local/bin/claude.exe'));
+    expect(pathSearchSpy.mock.calls.map(([name]) => name)).toEqual(['claude', 'claude.exe']);
+  });
+});

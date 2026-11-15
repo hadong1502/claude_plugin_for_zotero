@@ -39,6 +39,8 @@ export function zoteroCliPathDeps(): CliPathDeps {
       }
     },
     homeDir: Services.dirsvc.get('Home', Components.interfaces.nsIFile).path,
+    // On Windows only a .exe is spawned (#1): a .cmd or .bat would run through cmd.exe.
+    isWin: Zotero.isWin,
   };
 }
 

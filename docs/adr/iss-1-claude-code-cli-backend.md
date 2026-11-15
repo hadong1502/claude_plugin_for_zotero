@@ -54,6 +54,8 @@ Images go inline this way. No temporary PNG file or extra Read rule is needed.
 
 **Environment:** the plugin passes the process environment without the `CLAUDECODE`, `CLAUDE_CODE_*` and `CLAUDE_EFFORT` variables. A Zotero started from a Claude Code terminal during development otherwise inherits them, and `CLAUDE_EFFORT=high` made Haiku about 1.8 s slower.
 
+**Only a `.exe` is spawned on Windows (#1 final review):** Gecko's Subprocess runs a `.bat` or `.cmd` through `cmd.exe /s/c`. It quotes arguments MSVCRT-style (`\"`), which `cmd.exe` does not understand, so the `--settings` JSON leaves each Read rule outside cmd's quotes, and a `&` in a PDF file name (allowed in rule paths) would start a command. The plugin therefore spawns only a CLI path ending in `.exe`, case-insensitive. An override that isn't one makes the preferences status line say so, and a question fails with `cli-not-found` without spawning anything. Auto-detection skips a non-`.exe` PATH hit (an npm `claude` or `claude.cmd` shim) and searches for `claude.exe`, then falls back to `~/.local/bin/claude.exe`. A user whose only CLI is an npm or pnpm shim needs a native `claude.exe` install.
+
 **Reading the stream:**
 - Text comes only from `text_delta` stream events.
 - The Answer is done at the `result` event. The process exits about 0.7 s later, and a `system/task_summary` event may still follow.

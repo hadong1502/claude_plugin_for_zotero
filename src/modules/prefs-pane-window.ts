@@ -23,7 +23,9 @@ export function initPrefsPane(root: Element): Promise<void> {
   let detected: string | null = null;
   let detectionDone = false;
   const render = () => {
-    if (status && detectionDone) status.textContent = cliPathStatus(cliInput?.value ?? '', detected);
+    if (status && detectionDone) {
+      status.textContent = cliPathStatus(cliInput?.value ?? '', detected, Boolean(Zotero.isWin));
+    }
   };
   // Zotero fills bound fields after 'load', so re-render when it does.
   cliInput?.addEventListener('input', render);
