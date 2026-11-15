@@ -11,7 +11,7 @@ One pass through every user story of the spec in #1, run once against Zotero 10.
    - In the test profile open Settings → Advanced → Files and Folders → Data Directory Location, choose **Custom...**, and pick a new empty folder (for example `C:\ZoteroTest\data`). Zotero restarts. Check that the path shown is the test folder.
    - Do not sign in to Zotero sync in this profile. Never point it at `%APPDATA%\Zotero` or your normal data folder.
    - Alternative: `npm start` (README, "Develop") runs a dev instance with its own `.scaffold/profile` and `.scaffold/data`.
-2. **Build.** From the repo root run `npm install` (first time) and `npm run build`. The plugin is `.scaffold/build/claude-for-zotero.xpi` (`dist` and `xpiName` in `zotero-plugin.config.ts`). Also run `npm test`; note any failures in the Results section.
+2. **Build.** In the folder checked out on this feature branch (until it merges, the `.worktrees/feat-zotero-ask-claude` worktree, not the main checkout on `develop`) run `npm install` (first time) and `npm run build`. The plugin is `.scaffold/build/claude-for-zotero.xpi` (`dist` and `xpiName` in `zotero-plugin.config.ts`). Also run `npm test`; note any failures in the Results section.
 3. **Install.** In the test profile: Tools → Plugins → gear menu → Install Plugin From File, pick the .xpi. The plugin shows as **Claude for Zotero**, enabled. Zotero 10.0.8 is the only supported version (`strict_max_version` `10.0.*`).
 4. **Claude Code.** The CLI must be signed in: `claude` works in a terminal and answers a prompt. Record `claude --version` in the Results section.
 5. **Test library, no personal data.** In the test profile only, add public items, for example a public-domain arXiv paper (add it by its arXiv identifier) with its PDF. Create the preparation items listed in each per-ticket file: items A to E of t8 (with the `C:\Test papers\...` linked PDFs and `secret.txt` containing `PELICAN-42`), the standalone PDF, an EPUB, a web snapshot, a note, and a read-only group library item if you have one. Use only content that is safe to send to Claude: each question sends the item's title, authors, year and abstract, and Paper Context sends the PDF.
@@ -27,65 +27,65 @@ Result column: pass, fail or notes; link an issue for each fail. Every story has
 
 | Story | Title | Steps | Expected | Result |
 |---|---|---|---|---|
-| 1 | Claude section in the reader context pane | T4-1 | Section headed **Claude** with the speech-bubble icon next to an open PDF | |
-| 2 | Claude button in the context pane sidenav | T4-2, T4-X4 | Sidenav button with tooltip **Claude** scrolls to the section | |
-| 3 | Same pane in the library item pane | T4-3 | Claude section and sidenav button on a selected item | |
-| 4 | Library and reader share one Thread | T4-4, T10-10 | Both panes show the same Thread and streaming text | |
-| 5 | One Thread per parent item | T4-5 | Second item's pane is empty; first item's Thread untouched | |
-| 6 | Standalone PDF owns its Thread | T4-6, T4-6b, T4-6c | Works for a parentless PDF; PDF child shows parent's Thread; note has no section | |
-| 7 | Enter or Send asks | T4-7, T4-a | Enter and Send ask; Shift+Enter adds a line; no Zotero shortcuts fire | |
-| 8 | Follow-ups remember earlier turns | T4-8 | "What is my name?" answered from the earlier turn | |
-| 9 | Thread stays while Zotero is open | T4-9 | Thread survives switching items and tabs | |
-| 10 | Threads vanish on quit | T4-10 | Every Thread gone after restart | |
-| 11 | Clear a Thread | T4-11 | Thread empties, streaming Answer stops, Clear disabled when empty | |
-| 12 | Ask Claude Button in selection popup | T7-1 | **Ask Claude** button under the colour buttons | |
-| 13 | Inline Card pinned next to Selection | T7-3 | About 320px card below/above the Selection with the listed controls | |
-| 14 | Card stays anchored on scroll | T7-11, T7-12, T7-13 | Card follows scroll, zoom, resize, split view; hides when off-screen | |
-| 15 | One card at a time | T7-14, T7-15 | New Selection replaces the card and ends the old run, also across tabs | |
-| 16 | Close with ✕ or Esc | T7-16 | Card closes and the run is cancelled | |
-| 17 | Explain Quick Action | T7-4 | "Explain" shows as the question; Answer explains the passage | |
-| 18 | Define Quick Action | T7-5 | Brief definition of the term | |
-| 19 | Explain the math Quick Action | T7-6 | Restates the equation in LaTeX, typeset, then explains | |
-| 20 | Typed Inline Question | T7-7, T7-8 | Typed question answered; keys stay in the field | |
-| 21 | Continue in Pane link | T10-1, T10-2 | Link only under a finished Answer; click reveals the Claude section | |
-| 22 | Continue in Pane carries the exchange | T10-2 to T10-9, T10-11 | Imported turn present; Claude remembers it (resume or quoted context) | |
-| 23 | No button for EPUB and snapshots | T7-2 | No Ask Claude button in either popup | |
-| 24 | Item title, authors, year, abstract in every question | T7-7, C-CTX1 | Answer names the paper's title (and authors/year when asked) | |
-| 25 | Selection text sent | T7-4, T7-5 | Answer is about the highlighted passage | |
-| 26 | Picture of the highlighted region | T8-13, T8-14, T8-17 | Equation transcribed as typeset LaTeX; crop covers first page only; orientation correct | |
-| 27 | No whole-paper read for a quick definition | T8-4 | Fast answer, no Read in the CLI log | |
-| 28 | Claude decides whether to read the PDF | T8-7 | Record whether it reads; reading not required | |
-| 29 | "Use full paper" toggle | T8-1, T8-2, T8-3, T8-6, T8-8 | Checkbox in pane and card, per pane, never saved; forces a Read | |
-| 30 | Force phrases | T8-5, C-CTX1 | "use the paper", "READ THE PAPER", "add context", "use full paper" each trigger a Read | |
-| 31 | Claude reads the PDF itself | T8-5, T8-6, T8-18 | Read of the PDF path in the log; `--tools Read` form of command line | |
-| 32 | Fallback to extracted text or text only | T8-11, T8-12, T8-16 | Answer arrives without error from extracted text, Item Context or text only | |
-| 33 | Streaming Answers | T4-4, T7-4 | Text arrives incrementally | |
-| 34 | Markdown rendering | T6-1, T6-3 | Heading, list, table, code block render in pane and card | |
-| 35 | Math rendering | T6-2, T6-3, T6-7, T7-6 | KaTeX typeset in light and dark; bad math does not break the Answer | |
-| 36 | Stop button | T7-10, T4-c | Stop cancels the run; button returns to Send | |
-| 37 | Stop keeps the partial Answer | T7-10, T4-c | Partial text stays, followed by "Stopped." | |
-| 38 | Model picker | T7-9, T4-b | Picked model is used (`--model`) in pane and card | |
-| 39 | Picker defaults to preferred model | T7-3, T4-b, C-PR3 | New pane/card starts at the Settings default | |
-| 40 | Save as note under each Answer | T9-4, T9-12, T9-13 | One child note per press (standalone note for a parentless PDF) | |
-| 41 | Save Thread as note | T9-7, T9-7b, T9-8, T9-9 | One note with every finished and stopped turn in order | |
-| 42 | Notes are child notes with Zotero math | T9-4, T9-5, T9-6 | Math editable in the note editor; prices and code stay text | |
-| 43 | Save as annotation | T9-10, T9-14, T9-15 | Card button saves once | |
-| 44 | Annotation is a highlight with Q&A comment | T9-10, T9-11 | Highlight over the Selection; comment `Q: ...` plus Answer; right page label | |
-| 45 | Nothing written without a press | T9-1, T9-2, T9-3, T9-17 | Note and annotation counts unchanged | |
-| 46 | Claude preferences pane | C-PR1 | Settings → Claude pane with three groups | |
-| 47 | CLI path auto-detect and override | C-PR2, C-CLI1, T4-54, T4-X2 | Detected path shown; override used; missing path gives the plain message | |
-| 48 | Default model preference | C-PR3 | New panes and cards start at the chosen model | |
-| 49 | About me text | C-PR4 | Instruction in About me shows in the Answers | |
-| 50 | Answer language | C-PR5 | Language follows the field; empty matches the question | |
-| 51 | Uses the local Claude Code login | T4-51 | Answer arrives with no API key | |
-| 52 | Isolated from user's Claude Code setup | T4-52, T4-X1 | No connectors, hooks or skills; isolation flags on the command line | |
-| 53 | No tools except reading the one PDF | T4-53, T8-9, T8-10 | No tools without Paper Context; only the allowed PDF readable | |
-| 54 | CLI missing message | T4-54, T7-21, C-ERR1 | "Claude Code CLI not found. ..." | |
-| 55 | Signed-out message | T4-55, C-ERR1 | "Claude Code is not signed in. ..." | |
-| 56 | Usage-limit message | T4-56 | Message shown if a limit is hit (see notes below) | |
-| 57 | No automatic retries | T4-57, C-ERR2 | One error, one spawn | |
-| 58 | No orphaned processes | T4-58, T7-10, T7-16, T7-17, T7-22, L-3, L-6, L-7 | `claude.exe` gone within seconds after Clear, close, disable, quit | |
-| 59 | Clean disable and uninstall without restart | L-1 to L-5, T4-X8, T6-8, T7-22 | Button, pane and preferences go and return, no console errors | |
+| 1 | Claude section in the reader context pane | T4-1 | Section headed **Claude** with the speech-bubble icon next to an open PDF | pass |
+| 2 | Claude button in the context pane sidenav | T4-2, T4-X4 | Sidenav button with tooltip **Claude** scrolls to the section | pass |
+| 3 | Same pane in the library item pane | T4-3 | Claude section and sidenav button on a selected item | pass |
+| 4 | Library and reader share one Thread | T4-4, T10-10 | Both panes show the same Thread and streaming text | pass |
+| 5 | One Thread per parent item | T4-5 | Second item's pane is empty; first item's Thread untouched | pass |
+| 6 | Standalone PDF owns its Thread | T4-6, T4-6b, T4-6c | Works for a parentless PDF; PDF child shows parent's Thread; note has no section | pass |
+| 7 | Enter or Send asks | T4-7, T4-a | Enter and Send ask; Shift+Enter adds a line; no Zotero shortcuts fire | pass after fix d2c8298 (first run: no question reached the Thread; the plugin sandbox has no structuredClone) |
+| 8 | Follow-ups remember earlier turns | T4-8 | "What is my name?" answered from the earlier turn | pass |
+| 9 | Thread stays while Zotero is open | T4-9 | Thread survives switching items and tabs | pass |
+| 10 | Threads vanish on quit | T4-10 | Every Thread gone after restart | pass |
+| 11 | Clear a Thread | T4-11 | Thread empties, streaming Answer stops, Clear disabled when empty | pass |
+| 12 | Ask Claude Button in selection popup | T7-1 | **Ask Claude** button under the colour buttons | pass |
+| 13 | Inline Card pinned next to Selection | T7-3 | About 320px card below/above the Selection with the listed controls | pass after c3de56d (the reader cleared its highlight when the card opened; the card now marks the Selection) |
+| 14 | Card stays anchored on scroll | T7-11, T7-12, T7-13 | Card follows scroll, zoom, resize, split view; hides when off-screen | pass |
+| 15 | One card at a time | T7-14, T7-15 | New Selection replaces the card and ends the old run, also across tabs | pass |
+| 16 | Close with ✕ or Esc | T7-16 | Card closes and the run is cancelled | pass |
+| 17 | Explain Quick Action | T7-4 | "Explain" shows as the question; Answer explains the passage | pass |
+| 18 | Define Quick Action | T7-5 | Brief definition of the term | pass |
+| 19 | Explain the math Quick Action | T7-6 | Restates the equation in LaTeX, typeset, then explains | pass |
+| 20 | Typed Inline Question | T7-7, T7-8 | Typed question answered; keys stay in the field | pass |
+| 21 | Continue in Pane link | T10-1, T10-2 | Link only under a finished Answer; click reveals the Claude section | pass |
+| 22 | Continue in Pane carries the exchange | T10-2 to T10-9, T10-11 | Imported turn present; Claude remembers it (resume or quoted context) | pass |
+| 23 | No button for EPUB and snapshots | T7-2 | No Ask Claude button in either popup | pass |
+| 24 | Item title, authors, year, abstract in every question | T7-7, C-CTX1 | Answer names the paper's title (and authors/year when asked) | pass |
+| 25 | Selection text sent | T7-4, T7-5 | Answer is about the highlighted passage | pass |
+| 26 | Picture of the highlighted region | T8-13, T8-14, T8-17 | Equation transcribed as typeset LaTeX; crop covers first page only; orientation correct | pass after fix d2c8298 (the picture failed with "page.getViewport is not a function") |
+| 27 | No whole-paper read for a quick definition | T8-4 | Fast answer, no Read in the CLI log | pass |
+| 28 | Claude decides whether to read the PDF | T8-7 | Record whether it reads; reading not required | pass |
+| 29 | "Use full paper" toggle | T8-1, T8-2, T8-3, T8-6, T8-8 | Checkbox in pane and card, per pane, never saved; forces a Read | pass |
+| 30 | Force phrases | T8-5, C-CTX1 | "use the paper", "READ THE PAPER", "add context", "use full paper" each trigger a Read | pass |
+| 31 | Claude reads the PDF itself | T8-5, T8-6, T8-18 | Read of the PDF path in the log; `--tools Read` form of command line | pass after poppler setup and f33d2aa (see Results: the CLI misreported TeX Live's pdftoppm as "password-protected"; Paper Context now also reads the paper's text file) |
+| 32 | Fallback to extracted text or text only | T8-11, T8-12, T8-16 | Answer arrives without error from extracted text, Item Context or text only | pass |
+| 33 | Streaming Answers | T4-4, T7-4 | Text arrives incrementally | pass |
+| 34 | Markdown rendering | T6-1, T6-3 | Heading, list, table, code block render in pane and card | pass after fix 64681ca (Claude Pane stylesheets did not load) |
+| 35 | Math rendering | T6-2, T6-3, T6-7, T7-6 | KaTeX typeset in light and dark; bad math does not break the Answer | pass after fix 64681ca (math unstyled; the pane stretched to 5200px) |
+| 36 | Stop button | T7-10, T4-c | Stop cancels the run; button returns to Send | pass |
+| 37 | Stop keeps the partial Answer | T7-10, T4-c | Partial text stays, followed by "Stopped." | pass |
+| 38 | Model picker | T7-9, T4-b | Picked model is used (`--model`) in pane and card | pass |
+| 39 | Picker defaults to preferred model | T7-3, T4-b, C-PR3 | New pane/card starts at the Settings default | pass |
+| 40 | Save as note under each Answer | T9-4, T9-12, T9-13 | One child note per press (standalone note for a parentless PDF) | pass |
+| 41 | Save Thread as note | T9-7, T9-7b, T9-8, T9-9 | One note with every finished and stopped turn in order | pass |
+| 42 | Notes are child notes with Zotero math | T9-4, T9-5, T9-6 | Math editable in the note editor; prices and code stay text | pass |
+| 43 | Save as annotation | T9-10, T9-14, T9-15 | Card button saves once | pass |
+| 44 | Annotation is a highlight with Q&A comment | T9-10, T9-11 | Highlight over the Selection; comment `Q: ...` plus Answer; right page label | pass |
+| 45 | Nothing written without a press | T9-1, T9-2, T9-3, T9-17 | Note and annotation counts unchanged | pass |
+| 46 | Claude preferences pane | C-PR1 | Settings → Claude pane with three groups | pass |
+| 47 | CLI path auto-detect and override | C-PR2, C-CLI1, T4-54, T4-X2 | Detected path shown; override used; missing path gives the plain message | pass |
+| 48 | Default model preference | C-PR3 | New panes and cards start at the chosen model | pass |
+| 49 | About me text | C-PR4 | Instruction in About me shows in the Answers | pass |
+| 50 | Answer language | C-PR5 | Language follows the field; empty matches the question | pass |
+| 51 | Uses the local Claude Code login | T4-51 | Answer arrives with no API key | pass |
+| 52 | Isolated from user's Claude Code setup | T4-52, T4-X1 | No connectors, hooks or skills; isolation flags on the command line | pass |
+| 53 | No tools except reading the one PDF | T4-53, T8-9, T8-10 | No tools without Paper Context; only the allowed PDF readable | pass |
+| 54 | CLI missing message | T4-54, T7-21, C-ERR1 | "Claude Code CLI not found. ..." | pass |
+| 55 | Signed-out message | T4-55, C-ERR1 | "Claude Code is not signed in. ..." | pass |
+| 56 | Usage-limit message | T4-56 | Message shown if a limit is hit (see notes below) | pass |
+| 57 | No automatic retries | T4-57, C-ERR2 | One error, one spawn | pass |
+| 58 | No orphaned processes | T4-58, T7-10, T7-16, T7-17, T7-22, L-3, L-6, L-7 | `claude.exe` gone within seconds after Clear, close, disable, quit | pass |
+| 59 | Clean disable and uninstall without restart | L-1 to L-5, T4-X8, T6-8, T7-22 | Button, pane and preferences go and return, no console errors | pass |
 
 Notes on the table:
 - **Story 56** can only be checked by hand if you actually hit a usage limit. If you cannot, mark it "not run" and cite the unit tests: `tests/unit/failure.test.ts` pins the pattern-to-message mapping (`rate limit`, `usage limit`, `429`) and `tests/unit/runner.test.ts` the `rate-limited` event. The t4 file already says these patterns are unverified against a real limit.
@@ -179,23 +179,25 @@ Use a Thread with at least one finished Answer, a library item selected and a re
 
 ## 5. Results
 
-Fill this in by hand after the run.
+- **Date:** 2026-11-15
+- **Zotero version:** 10.0.8 (x64)
+- **OS:** Windows 11 (build 26300)
+- **Claude Code CLI version:** 2.1.325 (Claude Code)
+- **Plugin version / commit:** 0.1.0, feature branch at 5e38783 (fixes from this run included)
+- **Test profile and data directory:** a separate test profile with its own data directory, not the everyday library
+- **Tester initials:** —
+- **`npm test` and `npm run build` results:** build clean; 500 tests passed at the start of the run (00:25), 557 after the fixes below.
 
-- **Date:**
-- **Zotero version:** (expect 10.0.8)
-- **OS:**
-- **Claude Code CLI version:** (`claude --version`)
-- **Plugin version / commit:**
-- **Test profile and data directory (path):**
-- **Tester initials:**
-- **`npm test` and `npm run build` results:**
+Failures (one line each: story or step, what happened, fix):
 
-Failures (one line each: story or step, what happened, issue link):
+1. Stories 4, 7 and every question: nothing happened on Enter. Zotero's plugin sandbox has no `structuredClone`, so the Thread Store threw on every read. Fixed in d2c8298, with a test that guards window-only globals.
+2. Story 26: the Selection picture failed with `page.getViewport is not a function` (pdf.js page Xray-wrapped). Fixed in d2c8298.
+3. Stories 34, 35: Claude Pane Answers unstyled; KaTeX's 400em square-root graphic stretched the pane to 5200px, so nothing wrapped. `windowUtils.loadSheetUsingURIString` fails in Zotero 10.0.8; stylesheets now load as `<link>`. Fixed in 64681ca.
+4. Story 13: the reader cleared its highlight when the card opened. The card now marks the Selection (c3de56d).
+5. Story 31: Claude's Read of a 15-page PDF failed with "PDF is password-protected". The CLI renders page ranges with `pdftoppm -jpeg`; TeX Live's `pdftoppm` has no JPEG support and the CLI misreports the failure. Fixed on this machine by a full poppler ahead of TeX Live on PATH; Paper Context now also gives Claude the paper's text file so it works without poppler (f33d2aa, decided by the user).
 
-1.
-2.
-3.
-
-Steps not run, and why:
+Steps not run, and why: none reported.
 
 Notes:
+- Highlighting text does not feed Claude Pane questions; by design (#1 sends a Selection only with Inline Questions). Logged as a follow-up.
+- Model picker: Fable alias, per-Answer version labels and an effort setting were requested; logged as a follow-up.
