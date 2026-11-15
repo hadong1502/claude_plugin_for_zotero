@@ -12,7 +12,7 @@ export class ThreadStore {
   /** The Thread for `key`; empty if nothing was asked yet. Returns a deep copy. */
   get(key: ThreadKey): Thread {
     const thread = this.#threads.get(key);
-    return thread ? structuredClone(thread) : { key, turns: [] };
+    return thread ? copyThread(thread) : { key, turns: [] };
   }
 
   /** Adds a streaming turn and returns its id. */
@@ -118,4 +118,17 @@ export class ThreadStore {
   #notify(key: ThreadKey): void {
     for (const listener of [...this.#listeners]) listener(key);
   }
+}
+
+/**
+ * A deep copy of a Thread. Not `structuredClone`: Zotero's plugin sandbox
+ * has no such global (#1). Turns hold only strings and one flat `error`.
+ */
+function copyThread(thread: Thread): Thread {
+  return {
+    ...thread,
+    turns: thread.turns.map((turn) =>
+      turn.error ? { ...turn, error: { ...turn.error } } : { ...turn },
+    ),
+  };
 }

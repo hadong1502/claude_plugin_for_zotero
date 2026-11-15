@@ -97,7 +97,9 @@ async function render(
   const win = Components.utils.waiveXrays(frame) as PdfWindowLike;
   const pdfDocument = win.PDFViewerApplication?.pdfDocument;
   if (!pdfDocument || pageIndex >= pdfDocument.numPages) return undefined;
-  const page = await pdfDocument.getPage(pageIndex + 1);
+  // A content promise's value arrives here Xray-wrapped again, which hides
+  // pdf.js's prototype methods (getViewport); waive it too.
+  const page = Components.utils.waiveXrays(await pdfDocument.getPage(pageIndex + 1)) as PdfPageLike;
   if (run.isOver()) return undefined;
 
   // The box in canvas pixels at the crop's scale; min/max covers page rotation.
