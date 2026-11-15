@@ -15,7 +15,7 @@ import type { Thread, ThreadKey, Turn } from '../core/types';
 import { getPluginInfo } from '../plugin-info';
 import { ClaudePaneView, type PaneTarget } from './claude-pane-view';
 import { getCliPath } from './cli-locator';
-import { ensureCliWorkdir } from './cli-workdir';
+import { ensureCliWorkdir, paperTextDir } from './cli-workdir';
 import { saveAnswerNote, saveThreadNote } from './library-writer';
 import { getPref } from './prefs';
 import { createSubprocessPort } from './subprocess-port';
@@ -271,7 +271,7 @@ function readerTabID(body: Element, tabType: string): string | undefined {
 export type PaperLocation = { reader: Zotero.Item | null | undefined } | { selected: Zotero.Item };
 
 /**
- * The item's PDF (#8) as a Paper Source, or undefined when there is none.
+ * The item's PDF (#8) as a Paper Source, with its text file (#11), or undefined when there is none.
  * Its `pdfPath` is undefined when the file is missing. Never rejects.
  */
 export async function itemPaper(where: PaperLocation): Promise<PaperSource | undefined> {
@@ -290,7 +290,28 @@ export async function itemPaper(where: PaperLocation): Promise<PaperSource | und
           return undefined;
         }
       },
+      textFile: () => writePaperText(attachment),
     };
+  } catch (e) {
+    logError(e);
+    return undefined;
+  }
+}
+
+/**
+ * The paper's text file (#11): writes the attachment's extracted text, in
+ * full, to `<paper-text dir>/<attachment key>.txt` and returns its path, or
+ * undefined when the text is blank. Rewritten on each use. Never rejects.
+ */
+async function writePaperText(attachment: Zotero.Item): Promise<string | undefined> {
+  try {
+    const text = await attachment.attachmentText;
+    if (!text?.trim()) return undefined;
+    const dir = paperTextDir();
+    await IOUtils.makeDirectory(dir, { createAncestors: true, ignoreExisting: true });
+    const path = PathUtils.join(dir, `${attachment.key}.txt`);
+    await IOUtils.writeUTF8(path, text, { tmpPath: `${path}.tmp` });
+    return path;
   } catch (e) {
     logError(e);
     return undefined;

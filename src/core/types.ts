@@ -31,7 +31,7 @@ export interface ClaudeRequest {
   systemPrompt: string;
   /** Claude session id to resume, for follow-ups in a Thread. */
   resumeSessionId?: string;
-  /** Absolute paths Claude may Read (zero or one PDF). */
+  /** Absolute paths Claude may Read: none, or the paper's text file and/or its PDF (#8, #11). */
   readableFiles: string[];
 }
 
@@ -64,6 +64,8 @@ export interface QuestionInput {
   selection?: SelectionContext;
   paperContext: PaperContextMode;
   pdfPath?: string;
+  /** The paper's text file: its extracted text, written by the plugin (#1, #11). */
+  textPath?: string;
   /** Fallback Paper Context when Claude cannot read the PDF itself. */
   extractedText?: string;
   aboutMe: string;

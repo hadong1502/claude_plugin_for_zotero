@@ -63,10 +63,26 @@ describe('buildCliArgs with a readable file', () => {
     );
   });
 
-  it('two readable files throw', () => {
-    expect(() =>
-      buildCliArgs(request({ readableFiles: [FILE, 'C:\\p\\b.pdf'] }), { workdir: WORKDIR }),
-    ).toThrow('buildCliArgs: only one readable file is supported');
+  // #11 manual run: the paper's text file and the PDF are both readable.
+  it('two readable files get one allow rule each', () => {
+    const args = readableArgs({ readableFiles: ['C:\\p\\a.txt', 'C:\\p\\a.pdf'] });
+    expect(JSON.parse(args.at(-1) as string).permissions.allow).toEqual([
+      'Read(//c/p/a.txt)',
+      'Read(//c/p/a.pdf)',
+    ]);
+  });
+
+  it('the allow rules follow the readable-files order', () => {
+    const args = readableArgs({ readableFiles: ['C:\\p\\a.pdf', 'C:\\p\\a.txt'] });
+    expect(JSON.parse(args.at(-1) as string).permissions.allow).toEqual([
+      'Read(//c/p/a.pdf)',
+      'Read(//c/p/a.txt)',
+    ]);
+  });
+
+  it('two readable files keep the one workdir deny rule', () => {
+    const args = readableArgs({ readableFiles: ['C:\\p\\a.txt', 'C:\\p\\a.pdf'] });
+    expect(JSON.parse(args.at(-1) as string).permissions.deny).toEqual(['Read(//c/d/w/**)']);
   });
 });
 

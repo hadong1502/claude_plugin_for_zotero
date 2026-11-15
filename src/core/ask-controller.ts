@@ -15,10 +15,16 @@ import type {
   ThreadKey,
 } from './types';
 
-/** The paper behind the item: its PDF path and an extracted-text fallback (#8). */
+/** The paper behind the item: its PDF path, its text file and an extracted-text fallback (#8, #11). */
 export interface PaperSource {
   pdfPath?: string;
   loadText(): Promise<string | undefined>;
+  /**
+   * Writes the paper's extracted text to its text file and returns the path,
+   * or undefined when there is no non-blank text. A rejection counts as
+   * undefined (#11).
+   */
+  textFile?(): Promise<string | undefined>;
 }
 
 /** Extra context for a question; the Inline Card passes `source: 'inline'` (#7). */
@@ -59,8 +65,11 @@ interface Run {
 export class AskController {
   readonly #deps: AskControllerDeps;
   readonly #runs = new Map<ThreadKey, Run>();
-  /** PDF paths whose Read was denied at runtime, normalised; kept for the controller's lifetime (#8). */
-  readonly #deniedPdfs = new Set<string>();
+  /**
+   * Paths (the PDF or the paper's text file) whose Read was denied at runtime,
+   * normalised; kept for the controller's lifetime (#8, #11).
+   */
+  readonly #deniedReads = new Set<string>();
 
   constructor(deps: AskControllerDeps) {
     this.#deps = deps;
@@ -149,27 +158,42 @@ export class AskController {
     options: AskOptions,
     question: string,
     run: Run,
-  ): Promise<{ paperContext: 'none' | 'claude-decides' | 'forced'; pdfPath?: string; extractedText?: string }> {
+  ): Promise<{
+    paperContext: 'none' | 'claude-decides' | 'forced';
+    pdfPath?: string;
+    textPath?: string;
+    extractedText?: string;
+  }> {
     const paper = options.paper;
     const pdfPath = paper?.pdfPath;
+    // Paper Context still needs the PDF file itself (#8): no PDF, no text file.
     const mode = resolvePaperContext({
       useFullPaper: !!options.useFullPaper,
       question,
       hasPdf: pdfPath !== undefined,
     });
     if (mode === 'none' || !paper) return { paperContext: 'none' };
-    if (pdfPath !== undefined && canReadPdfPath(pdfPath) && !this.#deniedPdfs.has(normalisePath(pdfPath))) {
-      return { paperContext: mode, pdfPath };
+    const pdfOk = pdfPath !== undefined && this.#readable(pdfPath);
+    // The paper's text file (#11). A write that never settles must not hold
+    // the run once Stop or Clear hits it; ask() checks the run afterwards.
+    const textPath = await raceCancel(run, () => paper.textFile?.());
+    const textOk = textPath !== undefined && textPath !== '' && this.#readable(textPath);
+    if (pdfOk || textOk) {
+      return {
+        paperContext: mode,
+        pdfPath: pdfOk ? pdfPath : undefined,
+        textPath: textOk ? textPath : undefined,
+      };
     }
-    if (mode !== 'forced') return { paperContext: 'none' };
-    let text: string | undefined;
-    try {
-      // A load that never settles must not hold the run once Stop or Clear hits it.
-      text = await Promise.race([paper.loadText(), run.cancelSignal.then(() => undefined)]);
-    } catch {
-      text = undefined;
-    }
+    if (mode !== 'forced' || run.cancelRequested) return { paperContext: 'none' };
+    // A load that never settles must not hold the run once Stop or Clear hits it.
+    const text = await raceCancel(run, () => paper.loadText());
     return text?.trim() ? { paperContext: 'forced', extractedText: text } : { paperContext: 'none' };
+  }
+
+  /** A path Claude may Read: a verified rule form, and not denied before (#8, #11). */
+  #readable(path: string): boolean {
+    return canReadPdfPath(path) && !this.#deniedReads.has(normalisePath(path));
   }
 
   #rememberDenials(runner: RunnerLike, readable: string[]): void {
@@ -177,7 +201,7 @@ export class AskController {
     const denied = new Set((runner.deniedReads?.() ?? []).map(normalisePath));
     for (const path of readable) {
       const norm = normalisePath(path);
-      if (denied.has(norm)) this.#deniedPdfs.add(norm);
+      if (denied.has(norm)) this.#deniedReads.add(norm);
     }
   }
 
@@ -229,6 +253,21 @@ export class AskController {
     run.cancelRequested = true;
     run.signalCancel();
     run.runner?.cancel();
+  }
+}
+
+/**
+ * Awaits a paper load, but settles with undefined as soon as Stop or Clear
+ * hits the run; a rejection also counts as undefined (#8, #11).
+ */
+async function raceCancel(
+  run: Run,
+  load: () => Promise<string | undefined> | undefined,
+): Promise<string | undefined> {
+  try {
+    return await Promise.race([load(), run.cancelSignal.then(() => undefined)]);
+  } catch {
+    return undefined;
   }
 }
 

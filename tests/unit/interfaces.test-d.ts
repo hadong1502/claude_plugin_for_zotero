@@ -108,6 +108,7 @@ describe('shared types (src/core/types)', () => {
       selection?: SelectionContext;
       paperContext: PaperContextMode;
       pdfPath?: string;
+      textPath?: string;
       extractedText?: string;
       aboutMe: string;
       answerLanguage: string;

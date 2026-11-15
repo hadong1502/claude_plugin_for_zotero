@@ -205,7 +205,7 @@ export class ClaudeRunner {
   }
 }
 
-/** A workdir without a verified rule path can't scope Read: spawn without the file (#8). */
+/** A workdir without a verified rule path can't scope Read: spawn without any readable file (#8, #11). */
 function forWorkdir(request: ClaudeRequest, workdir: string): ClaudeRequest {
   if (request.readableFiles.length === 0 || canReadPdfPath(workdir)) return request;
   return { ...request, readableFiles: [] };

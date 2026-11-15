@@ -21,6 +21,18 @@ export const PAPER_READ_WHEN_NEEDED = (pdfPath: string): string =>
 export const PAPER_READ_FIRST = (pdfPath: string): string =>
   `The paper's PDF is at ${pdfPath}. Read it with the Read tool before answering, and base your Answer on it.`;
 
+// The paper's text file, alone or with the PDF (#11 manual run): Read handles
+// text anywhere, but PDF pages need poppler, so the text file is read first.
+export const PAPER_TEXT_WHEN_NEEDED = (textPath: string, pdfPath?: string): string =>
+  pdfPath === undefined
+    ? `The paper's text, extracted from its PDF, is at ${textPath}. Read it with the Read tool only if the question needs the paper's content beyond what is given here.`
+    : `The paper's text, extracted from its PDF, is at ${textPath}, and the PDF itself is at ${pdfPath}. Read the text file with the Read tool only if the question needs the paper's content beyond what is given here. Read pages of the PDF only when you need to see an equation, figure or table as typeset.`;
+
+export const PAPER_TEXT_FIRST = (textPath: string, pdfPath?: string): string =>
+  pdfPath === undefined
+    ? `The paper's text, extracted from its PDF, is at ${textPath}. Read it with the Read tool before answering, and base your Answer on it.`
+    : `The paper's text, extracted from its PDF, is at ${textPath}, and the PDF itself is at ${pdfPath}. Read the text file with the Read tool before answering, and base your Answer on it. Read pages of the PDF when you need to see an equation, figure or table as typeset.`;
+
 export const PAPER_TEXT_INCLUDED =
   "The paper's full text, extracted from its PDF, is included in the message. Base your Answer on it.";
 
@@ -39,9 +51,11 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
       : `Answer in ${language}.`,
   );
 
-  // Paper Context (#8): extracted text wins over the PDF; a mode with neither
-  // behaves as 'none'.
-  const { paperContext, pdfPath } = input;
+  // Paper Context (#8): inline extracted text wins over the readable files (the
+  // paper's text file, then the PDF, #11); a mode with none behaves as 'none'.
+  const { paperContext } = input;
+  const pdfPath = input.pdfPath === '' ? undefined : input.pdfPath;
+  const textPath = input.textPath === '' ? undefined : input.textPath;
   const hasText = input.extractedText !== undefined && input.extractedText !== '';
   let paperText: string | undefined;
   let readableFiles: string[] = [];
@@ -52,7 +66,14 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
         ? `${full.slice(0, EXTRACTED_TEXT_LIMIT)}\n[…truncated]`
         : full;
     parts.push(PAPER_TEXT_INCLUDED);
-  } else if (paperContext !== 'none' && pdfPath !== undefined && pdfPath !== '') {
+  } else if (paperContext !== 'none' && textPath !== undefined) {
+    readableFiles = pdfPath === undefined ? [textPath] : [textPath, pdfPath];
+    parts.push(
+      paperContext === 'forced'
+        ? PAPER_TEXT_FIRST(textPath, pdfPath)
+        : PAPER_TEXT_WHEN_NEEDED(textPath, pdfPath),
+    );
+  } else if (paperContext !== 'none' && pdfPath !== undefined) {
     readableFiles = [pdfPath];
     parts.push(
       paperContext === 'forced' ? PAPER_READ_FIRST(pdfPath) : PAPER_READ_WHEN_NEEDED(pdfPath),

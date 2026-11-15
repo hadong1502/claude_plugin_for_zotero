@@ -5,18 +5,18 @@ import type { ClaudeRequest, ContentBlock } from './types';
 
 /**
  * Arguments of one CLI run. The question never goes here: it goes to stdin.
- * With one readable file the Read tool is scoped to exactly that PDF and the
- * workdir is denied (#8, #1 ADR claude-code-cli-backend).
+ * With readable files the Read tool is scoped to exactly those files (the
+ * paper's text file and/or its PDF), one allow rule each in order, and the
+ * workdir is denied (#8, #11, #1 ADR claude-code-cli-backend).
  */
 export function buildCliArgs(request: ClaudeRequest, options?: { workdir?: string }): string[] {
   const files = request.readableFiles;
-  if (files.length > 1) throw new Error('buildCliArgs: only one readable file is supported');
   let toolFlags: string[] = ['--tools', ''];
-  if (files.length === 1) {
+  if (files.length > 0) {
     if (!options?.workdir) throw new Error('buildCliArgs: workdir is required with a readable file');
     const settings = {
       permissions: {
-        allow: [`Read(${readRulePath(files[0])})`],
+        allow: files.map((file) => `Read(${readRulePath(file)})`),
         deny: [`Read(${readRulePath(options.workdir)}/**)`],
       },
     };
