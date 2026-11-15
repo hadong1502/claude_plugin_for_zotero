@@ -5,6 +5,13 @@
 // with fallbacks. The Answer rules mirror addon/content/pane.css.
 
 export const INLINE_CARD_CSS = `
+.cfz-card-mark {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  border-radius: 2px;
+  background: rgba(56, 128, 255, 0.3);
+}
 .cfz-card {
   position: fixed;
   z-index: 10000;

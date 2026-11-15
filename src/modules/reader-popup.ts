@@ -272,6 +272,26 @@ function createAnchor(
       }
       return popupBox && fallbackView ? { anchor: popupBox, view: fallbackView } : null;
     },
+    marks() {
+      if (!view?.getClientRectForPopup || !view._iframe || !position) return [];
+      const rects = position.rects as ArrayLike<ArrayLike<unknown>> | undefined;
+      const win = doc.defaultView;
+      if (!rects || !win) return [];
+      const frame = view._iframe.getBoundingClientRect();
+      const lines: Box[] = [];
+      for (let i = 0; i < rects.length; i++) {
+        // One line at a time, made in the reader's window so its code can read it.
+        const one = Components.utils.cloneInto(
+          { pageIndex: position.pageIndex, rects: [Array.from(rects[i]!, Number)] },
+          win,
+        );
+        const r = view.getClientRectForPopup(one);
+        const [x1, y1, x2, y2] = [Number(r[0]), Number(r[1]), Number(r[2]), Number(r[3])];
+        if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+        lines.push({ left: frame.left + x1, top: frame.top + y1, right: frame.left + x2, bottom: frame.top + y2 });
+      }
+      return lines;
+    },
     watch(onMove, onEscape) {
       const disposers: Array<() => void> = [];
       const listen = (target: EventTarget | null | undefined, type: string, fn: (e: Event) => void, capture = false) => {

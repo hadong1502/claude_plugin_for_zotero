@@ -54,3 +54,21 @@ export function placeCard(anchor: Box, view: Box, size: CardSize): CardPlacement
 
   return { visible, side, left, y, maxHeight: height };
 }
+
+/**
+ * The Selection's lines as drawn while the Inline Card is open: each cut to
+ * the visible view, and dropped when nothing of it shows (#1, #11).
+ */
+export function visibleMarks(lines: Box[], view: Box): Box[] {
+  const marks: Box[] = [];
+  for (const line of lines) {
+    const mark = {
+      left: Math.max(line.left, view.left),
+      top: Math.max(line.top, view.top),
+      right: Math.min(line.right, view.right),
+      bottom: Math.min(line.bottom, view.bottom),
+    };
+    if (mark.right > mark.left && mark.bottom > mark.top) marks.push(mark);
+  }
+  return marks;
+}

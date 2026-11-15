@@ -11,7 +11,7 @@
 // and goes with every question, Quick Actions included.
 import type { AskController, PaperSource } from '../core/ask-controller';
 import { renderAnswerHtml } from '../core/answer-renderer';
-import { placeCard, type Box, type CardSize } from '../core/card-placement';
+import { placeCard, visibleMarks, type Box, type CardSize } from '../core/card-placement';
 import { QUICK_ACTION_WORDINGS } from '../core/context-builder';
 import { continuedQuestion, type ContinuedExchange } from '../core/continue-in-pane';
 import { errorCopy } from '../core/failure';
@@ -65,6 +65,11 @@ export interface CardAnchor {
    * resize) and `onEscape` on Escape in the view. Returns a disposer.
    */
   watch(onMove: () => void, onEscape: () => void): () => void;
+  /**
+   * The Selection's lines in client coordinates, for the marker the card
+   * draws while open (the reader clears its own highlight); [] when unknown.
+   */
+  marks?(): Box[];
 }
 
 export interface InlineCardDeps {
@@ -102,6 +107,8 @@ export class InlineCard {
   readonly #deps: InlineCardDeps;
   readonly #doc: Document;
   readonly #root: HTMLElement;
+  /** The Selection marker: one translucent box per selected line. */
+  readonly #marks: HTMLElement;
   readonly #body: HTMLElement;
   readonly #question: HTMLElement;
   readonly #answer: HTMLElement;
@@ -251,7 +258,8 @@ export class InlineCard {
     // The reader cancels pointerdown outside its own inputs, which would block
     // selecting Answer text; keep the card's pointer events to itself.
     this.#root.addEventListener('pointerdown', (event) => event.stopPropagation());
-    (doc.body ?? doc.documentElement).append(this.#root);
+    this.#marks = this.#el('div', 'cfz-card-marks');
+    (doc.body ?? doc.documentElement).append(this.#marks, this.#root);
 
     this.#disposers.push(
       deps.store.subscribe((changed) => {
@@ -294,6 +302,7 @@ export class InlineCard {
       if (this.#answerFrame !== null) win?.cancelAnimationFrame(this.#answerFrame);
       if (this.#placeFrame !== null) win?.cancelAnimationFrame(this.#placeFrame);
       this.#root.remove();
+      this.#marks.remove();
     } catch (e) {
       // The reader document may already be gone.
       this.#deps.logError(e);
@@ -524,6 +533,7 @@ export class InlineCard {
       return;
     }
     if (!measured) return;
+    this.#placeMarks(anchor, measured.view);
     const placement = placeCard(measured.anchor, measured.view, SIZE);
     const style = this.#root.style;
     style.visibility = placement.visible ? '' : 'hidden';
@@ -537,6 +547,25 @@ export class InlineCard {
       style.top = '';
       style.bottom = `${this.#doc.documentElement.clientHeight - placement.y}px`;
     }
+  }
+
+  /** Draws the Selection's visible lines; a failure only loses the marker. */
+  #placeMarks(anchor: CardAnchor, view: Box): void {
+    let marks: Box[] = [];
+    try {
+      marks = anchor.marks ? visibleMarks(anchor.marks(), view) : [];
+    } catch (e) {
+      this.#deps.logError(e);
+    }
+    const boxes = Array.from(this.#marks.children) as HTMLElement[];
+    for (const extra of boxes.splice(marks.length)) extra.remove();
+    marks.forEach((mark, i) => {
+      const box = boxes[i] ?? this.#marks.appendChild(this.#el('div', 'cfz-card-mark'));
+      box.style.left = `${mark.left}px`;
+      box.style.top = `${mark.top}px`;
+      box.style.width = `${mark.right - mark.left}px`;
+      box.style.height = `${mark.bottom - mark.top}px`;
+    });
   }
 
   #button(className: string, label: string): HTMLButtonElement {
