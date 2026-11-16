@@ -279,7 +279,8 @@ export class ClaudePaneView {
     const root = this.#html('div', 'claude-pane-turn');
     root.style.cssText = 'display: flex; flex-direction: column; gap: 4px; user-select: text;';
     const question = this.#html('div', 'claude-pane-question');
-    question.style.cssText = 'font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere;';
+    question.style.cssText =
+      'font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; text-align: right; color: var(--fill-secondary, GrayText);';
     // Styled by pane.css, scoped under .claude-pane-answer.
     const answer = this.#html('div', 'claude-pane-answer');
     answer.style.cssText = 'overflow-wrap: anywhere;';

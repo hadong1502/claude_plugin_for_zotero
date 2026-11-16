@@ -1,4 +1,4 @@
-// Saving Answers as Zotero notes (#1, #9): question paragraphs, Markdown kept,
+// Saving Answers as Zotero notes (#1, #9): gray, left-aligned Heading 1 questions, Markdown kept,
 // math in Zotero's note format (no KaTeX), turns joined by a rule.
 import { describe, expect, it } from 'vitest';
 
@@ -9,9 +9,16 @@ function note(answer: string, question = 'Q?'): string {
 }
 
 describe('toNoteHtml', () => {
-  it('a single turn starts with the question paragraph', () => {
+  it('a single turn starts with the question heading', () => {
     const html = toNoteHtml([{ question: 'What is x?', answer: 'It is **bold**.' }]);
-    expect(html.startsWith('<p><strong>Question:</strong> What is x?</p>')).toBe(true);
+    expect(html.startsWith('<h1 style="text-align: left"><span style="color: #808080">Question: What is x?</span></h1>')).toBe(true);
+  });
+
+  // Zotero's note preview in the reader splits the stored HTML on line breaks:
+  // without one after the heading, the question and the Answer's first line fuse.
+  it('the question heading is followed by a line break', () => {
+    const html = toNoteHtml([{ question: 'What is x?', answer: 'It is **bold**.' }]);
+    expect(html).toContain('</span></h1>\n<p>');
   });
 
   it('the Answer keeps its Markdown', () => {
@@ -21,7 +28,7 @@ describe('toNoteHtml', () => {
 
   it('question text is escaped', () => {
     const html = note('ok', 'a < b & "c"');
-    expect(html).toContain('<p><strong>Question:</strong> a &lt; b &amp; &quot;c&quot;</p>');
+    expect(html).toContain('<h1 style="text-align: left"><span style="color: #808080">Question: a &lt; b &amp; &quot;c&quot;</span></h1>');
   });
 
   it('question newlines become breaks', () => {
@@ -67,7 +74,7 @@ describe('toNoteHtml', () => {
       { question: 'Second?', answer: 'two' },
     ]);
     const parts = html.split('<hr/>');
-    expect(parts.length === 2 && parts[1].includes('<p><strong>Question:</strong> Second?</p>')).toBe(true);
+    expect(parts.length === 2 && parts[1].includes('<h1 style="text-align: left"><span style="color: #808080">Question: Second?</span></h1>')).toBe(true);
   });
 
   it('no rule after the last turn', () => {

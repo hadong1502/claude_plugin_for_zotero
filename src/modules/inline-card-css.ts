@@ -98,6 +98,8 @@ export const INLINE_CARD_CSS = `
   font-weight: 600;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  text-align: right;
+  color: var(--fill-secondary, GrayText);
 }
 .cfz-card-status {
   white-space: pre-wrap;
