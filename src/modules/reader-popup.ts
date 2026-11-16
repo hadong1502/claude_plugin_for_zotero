@@ -140,6 +140,8 @@ interface ReaderLike {
   /** The reader's tab (xpcom/reader.js). */
   tabID?: string;
   _internalReader?: InternalReaderLike;
+  /** Scrolls the reader to a location (xpcom/reader.js). */
+  navigate?(location: { annotationID: string }): unknown;
 }
 
 function openCard(
@@ -228,8 +230,8 @@ function onAnnotationMenu(event: AnnotationMenuEvent): void {
 function openAnnotationCard(reader: ReaderLike, doc: Document, item: Zotero.Item): void {
   const current = registration;
   if (!current) return;
-  const library = Zotero.Libraries.get(item.libraryID);
-  const editable = !item.annotationIsExternal && !!library && library.editable;
+  // isEditable covers a read-only library and another member's group annotation (#14).
+  const editable = item.isEditable() && !item.annotationIsExternal && !reader._item.deleted;
   const data = annotationSelection({
     type: String(item.annotationType),
     text: item.annotationText ?? '',
@@ -243,25 +245,22 @@ function openAnnotationCard(reader: ReaderLike, doc: Document, item: Zotero.Item
     logError(new Error(`Inline Card: annotation ${item.key} has no usable position`));
     return;
   }
-  const selection: CapturedSelection = {
-    text: data.text,
-    pageLabel: data.pageLabel === '' ? undefined : data.pageLabel,
-    comment: data.comment,
-    pageIndex: data.pageIndex,
-    rects: data.rects,
-    annotationKey: data.annotationKey,
-    editable: data.editable,
-  };
+  const selection: CapturedSelection = { ...data, pageLabel: data.pageLabel === '' ? undefined : data.pageLabel };
   const win = doc.defaultView;
   // Made in the reader's window so its view code can read the position.
   const position = win
     ? Components.utils.cloneInto({ pageIndex: data.pageIndex, rects: data.rects }, win)
     : undefined;
+  // Brings the annotation into view; a failure only loses the scroll (#14).
+  guard(() => {
+    void Promise.resolve(reader.navigate?.({ annotationID: item.key })).catch(logError);
+  });
   const anchor = createAnchor(reader, doc, position, {
     secondary: false,
     popupBox: null,
     fallbackView: toBox(doc.documentElement.getBoundingClientRect()),
     marks: false,
+    showOffscreen: true,
   });
   openCardWith(current, reader, doc, selection, anchor, (turn) =>
     addToAnnotation(item.libraryID, data.annotationKey, turn.question, turn.answer),
@@ -327,6 +326,12 @@ interface AnchorPlace {
   fallbackView: Box | null;
   /** Draw the Selection marker; off for an annotation, which shows itself (#14). */
   marks: boolean;
+  /**
+   * If the first measure puts the Selection outside the view, place the card
+   * at the fallback place rather than hiding it; later measures hide it as
+   * usual (#14, an annotation may still be scrolling into view).
+   */
+  showOffscreen?: boolean;
 }
 
 /** The anchor for a card opened from the selection popup. */
@@ -379,11 +384,20 @@ function createAnchor(
     };
   };
 
+  let first = true;
+  const fallback = () => (popupBox && fallbackView ? { anchor: popupBox, view: fallbackView } : null);
   return {
     measure() {
+      const isFirst = first;
+      first = false;
       try {
         const measured = measureView();
-        if (measured) return measured;
+        if (measured) {
+          const { anchor: a, view: v } = measured;
+          const inside = a.bottom > v.top && a.top < v.bottom && a.right > v.left && a.left < v.right;
+          if (isFirst && place.showOffscreen && !inside) return fallback() ?? measured;
+          return measured;
+        }
       } catch (e) {
         logError(e);
       }

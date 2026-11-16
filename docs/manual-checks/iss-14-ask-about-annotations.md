@@ -20,16 +20,17 @@ Open Process Explorer, or use the plugin-process command from the #1 checklist.
 | 5 | Scroll and zoom while the card is open. | The card follows the region and hides when the region scrolls out of view. (Story 5) |
 | 6 | Right-click the highlight → Ask Claude → **Explain**. | The Answer is about that highlight's passage. (Stories 2, 8) |
 | 7 | Right-click the underline with the comment → Ask Claude, and ask `Answer my comment`. | Claude addresses "Is this the same as eq. 2?", so the comment reached it. (Story 9) |
-| 8 | Do steps 1–2 from the **annotations sidebar** instead of the page. | The same **Ask Claude** item appears and opens the same card. (Story 3) |
+| 8 | Scroll so a highlight is off-screen, then do steps 1–2 on it from the **annotations sidebar** instead of the page. | The same **Ask Claude** item appears. The reader scrolls to the annotation and the same card appears next to it, not hidden. (Story 3) |
 | 9 | Select two annotations (Ctrl+click in the sidebar) and right-click. | No **Ask Claude** item. (Story 10) |
 | 10 | Right-click the note annotation, then the ink annotation. | No **Ask Claude** item. (Story 11) |
 | 11 | In a card opened from the underline, let the Answer finish and press **Add to annotation**. | The button confirms the save. The underline's comment now reads `Is this the same as eq. 2?`, a blank line, then `Q: …`, a blank line, and the Answer. No new highlight is created. (Stories 12, 13) |
 | 12 | Ask a second question in a new card on the same underline, then press **Add to annotation** again. | A second `Q: …` block follows the first, separated by a blank line. Nothing is overwritten. (Story 14) |
 | 13 | In a card opened from a highlight, press **Save as note**, then **Continue in Pane**. | A child note is created, and the pane shows the exchange, as for a fresh highlight. (Story 15) |
-| 14 | Open a PDF in a group library where you can't edit, or use an annotation imported from the PDF file (it shows a lock). Right-click it → Ask Claude. | The card works. Under the finished Answer there's **Save as note** (if you can write notes) and **Continue in Pane**, but no **Add to annotation**. (Story 16) |
+| 14 | Open a PDF in a group library where you can't edit, or use an annotation imported from the PDF file (it shows a lock). Right-click it → Ask Claude. A group annotation created by another member counts too. | The card works. Under the finished Answer there's **Save as note** (if you can write notes) and **Continue in Pane**, but no **Add to annotation**. (Story 16) |
 | 15 | Highlight fresh text and press the popup's **Ask Claude** button. | Unchanged from #1: a blue marker appears and the button reads **Save as annotation**, which creates a new highlight. |
 | 16 | Open an EPUB, create a highlight, and right-click it. | No **Ask Claude** item. (Story 19) |
 | 17 | Disable the plugin in Tools → Plugins, then right-click an annotation. | No **Ask Claude** item, and no console errors. Re-enable the plugin, and the item is back. |
+| 18 | Move an item with an annotated PDF to the trash, open the PDF from the trash, right-click an annotation → Ask Claude. | The card works, but under the finished Answer there is no **Add to annotation**. (Story 16) |
 
 ## Watch for these (not verifiable statically)
 
