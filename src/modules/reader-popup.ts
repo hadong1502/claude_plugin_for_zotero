@@ -140,6 +140,8 @@ interface ReaderLike {
   /** The reader's tab (xpcom/reader.js). */
   tabID?: string;
   _internalReader?: InternalReaderLike;
+  /** The reader document's window, where the Inline Card lives (xpcom/reader.js). */
+  _iframeWindow?: Window | null;
   /** Scrolls the reader to a location (xpcom/reader.js). */
   navigate?(location: { annotationID: string }): unknown;
 }
@@ -213,7 +215,7 @@ type AnnotationMenuEvent = _ZoteroTypes.Reader.EventParams<'createAnnotationCont
  * exactly one highlight, underline or Area Annotation of a PDF is selected (#14).
  */
 function onAnnotationMenu(event: AnnotationMenuEvent): void {
-  const { reader, doc, params, append } = event;
+  const { reader, params, append } = event;
   const keys = Array.from((params as { ids?: ArrayLike<unknown> }).ids ?? [], String);
   const libraryID = (reader as unknown as ReaderLike)._item.libraryID;
   const items = keys.map((key) => Zotero.Items.getByLibraryAndKey(libraryID, key) || null);
@@ -222,7 +224,15 @@ function onAnnotationMenu(event: AnnotationMenuEvent): void {
   const item = items[0]!;
   append({
     label: 'Ask Claude',
-    onCommand: () => guard(() => openAnnotationCard(reader as unknown as ReaderLike, doc, item)),
+    onCommand: () =>
+      guard(() => {
+        // Context-menu events carry no `doc` (only the render events do), so
+        // the card goes into the reader's own document (#14).
+        const readerLike = reader as unknown as ReaderLike;
+        const doc = readerLike._iframeWindow?.document;
+        if (!doc) throw new Error('Inline Card: the reader document is not available');
+        openAnnotationCard(readerLike, doc, item);
+      }),
   });
 }
 
