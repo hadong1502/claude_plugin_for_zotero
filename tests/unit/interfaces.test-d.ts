@@ -90,12 +90,14 @@ describe('shared types (src/core/types)', () => {
     }>();
   });
 
-  it('SelectionContext carries text, optional page label and optional PNG', () => {
+  // #14 deliberately adds the optional comment.
+  it('SelectionContext carries text, optional page label, optional PNG and optional comment', () => {
     type Subject = import('../../src/core/types').SelectionContext;
     expectTypeOf<Subject>().toEqualTypeOf<{
       text: string;
       pageLabel?: string;
       imagePng?: string;
+      comment?: string;
     }>();
   });
 
