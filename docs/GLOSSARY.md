@@ -41,8 +41,12 @@ _Avoid_: Send to sidebar, escalate
 ## Context
 
 **Selection**:
-The passage the user highlighted in the reader when pressing the Ask Claude Button.
+The passage or region an Inline Question is about: text the user highlighted in the reader when pressing the Ask Claude Button, or an existing highlight, underline or area annotation the user asked about.
 _Avoid_: Highlight, quote, snippet
+
+**Area Annotation**:
+An image annotation the user drew around part of a PDF page with Zotero's Select Area tool. Asked about, its Selection is a picture of that region with no text.
+_Avoid_: Snippet, screenshot, image selection
 
 **Item Context**:
 The item's bibliographic metadata (title, authors, year, abstract) that accompanies every question.
@@ -59,5 +63,5 @@ A child note of the item holding a question and its Answer, created only when th
 _Avoid_: Export, transcript
 
 **Saved Annotation**:
-A highlight annotation on a Selection whose comment holds an Inline Question and its Answer, created only when the user asks.
+An annotation whose comment holds an Inline Question and its Answer, created only when the user asks: a new highlight on a freshly highlighted Selection, or the existing annotation the question was about, with the question and Answer appended to its comment.
 _Avoid_: Q&A highlight
