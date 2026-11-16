@@ -39,6 +39,8 @@ export const PAPER_TEXT_INCLUDED =
 export const EXTRACTED_TEXT_LIMIT = 150000;
 
 export const SELECTION_PICTURE_NOTE = '(A picture of the selected region is attached.)';
+/** A Selection with neither text nor a picture: an Area Annotation whose picture failed (#14). */
+export const SELECTION_NO_TEXT_NOTE = '(The selected region has no text, and its picture could not be attached.)';
 
 export function buildQuestion(input: QuestionInput): BuiltQuestion {
   const parts = [BASE_SYSTEM_PROMPT];
@@ -110,9 +112,17 @@ export function buildQuestion(input: QuestionInput): BuiltQuestion {
       selection.pageLabel !== undefined && selection.pageLabel !== ''
         ? `Selection (page ${selection.pageLabel}):`
         : 'Selection:';
-    // The Selection's text goes in verbatim: not trimmed, not escaped.
-    lines.push('', heading, '"""', selection.text, '"""');
-    if (selection.imagePng !== undefined) lines.push(SELECTION_PICTURE_NOTE);
+    lines.push('', heading);
+    if (selection.text.trim() !== '') {
+      // The Selection's text goes in verbatim: not trimmed, not escaped.
+      lines.push('"""', selection.text, '"""');
+      if (selection.imagePng !== undefined) lines.push(SELECTION_PICTURE_NOTE);
+    } else {
+      // An Area Annotation has no text, only its picture (#14).
+      lines.push(selection.imagePng !== undefined ? SELECTION_PICTURE_NOTE : SELECTION_NO_TEXT_NOTE);
+    }
+    const comment = selection.comment?.trim();
+    if (comment) lines.push(`Your comment on this region: ${comment}`);
   }
   // A Quick Action's fixed wording replaces any typed text.
   const question =

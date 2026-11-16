@@ -5,8 +5,11 @@
 //   library when the Thread belongs to a standalone attachment, since notes
 //   cannot be children of attachments in the item tree;
 // - a Saved Annotation is a highlight on the Selection through
-//   `Zotero.Annotations.saveFromJSON`, with a fresh key.
+//   `Zotero.Annotations.saveFromJSON`, with a fresh key; for a card opened
+//   from an existing annotation (#14), the Q&A is appended to that
+//   annotation's comment instead.
 // Errors propagate to the caller, which reports them.
+import { appendToComment } from '../core/annotation-question';
 import { toAnnotationText, toNoteHtml } from '../core/answer-renderer';
 import { highlightJson, saveableTurns, type SelectionAnnotation } from '../core/saving';
 import type { Thread, Turn } from '../core/types';
@@ -46,6 +49,20 @@ export async function saveAnnotation(
     attachment,
     json as unknown as _ZoteroTypes.Annotations.AnnotationJson,
   );
+}
+
+/** Appends the question and Answer to an existing annotation's comment, below what is there (#14). */
+export async function addToAnnotation(
+  libraryID: number,
+  annotationKey: string,
+  question: string,
+  answer: string,
+): Promise<Zotero.Item> {
+  const item = await Zotero.Items.getByLibraryAndKeyAsync(libraryID, annotationKey);
+  if (!item || !item.isAnnotation()) throw new Error('Inline Card: the annotation no longer exists');
+  item.annotationComment = appendToComment(item.annotationComment ?? '', toAnnotationText(question, answer));
+  await item.saveTx();
+  return item;
 }
 
 async function saveNote(item: Zotero.Item, html: string): Promise<Zotero.Item> {

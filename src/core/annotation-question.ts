@@ -31,27 +31,55 @@ export interface AnnotationSelection {
   editable: boolean;
 }
 
-/** Whether the annotation context menu offers Ask Claude. */
-export function canAskAboutAnnotations(_o: {
-  readerType: string;
-  annotationTypes: string[];
-}): boolean {
-  throw new Error('not implemented (#14)');
+/** Annotation types with a passage or region to ask about (#14). */
+const ASKABLE_TYPES = new Set(['highlight', 'underline', 'image']);
+
+/** Whether the annotation context menu offers Ask Claude: one highlight, underline or Area Annotation in a PDF. */
+export function canAskAboutAnnotations(o: { readerType: string; annotationTypes: string[] }): boolean {
+  return o.readerType === 'pdf' && o.annotationTypes.length === 1 && ASKABLE_TYPES.has(o.annotationTypes[0]!);
 }
 
 /** The Selection an Inline Card asks about, from one annotation; null when its position is unusable. */
-export function annotationSelection(_a: AnnotationData): AnnotationSelection | null {
-  throw new Error('not implemented (#14)');
+export function annotationSelection(a: AnnotationData): AnnotationSelection | null {
+  let position: unknown;
+  try {
+    position = JSON.parse(a.position);
+  } catch {
+    return null;
+  }
+  if (!position || typeof position !== 'object') return null;
+  const { pageIndex, rects } = position as { pageIndex?: unknown; rects?: unknown };
+  if (typeof pageIndex !== 'number' || !Number.isInteger(pageIndex) || pageIndex < 0) return null;
+  if (!Array.isArray(rects) || rects.length === 0) return null;
+  const isRect = (r: unknown): r is number[] =>
+    Array.isArray(r) && r.length === 4 && r.every((n) => typeof n === 'number' && Number.isFinite(n));
+  if (!rects.every(isRect)) return null;
+  return {
+    pageIndex,
+    rects: rects.map((r) => [...r]),
+    // An Area Annotation is a picture only; any text Zotero holds for it is ignored.
+    text: a.type === 'image' ? '' : a.text,
+    pageLabel: a.pageLabel,
+    comment: a.comment,
+    annotationKey: a.key,
+    editable: a.editable,
+  };
 }
 
-/** The annotation comment after "Add to annotation" appends `addition`. */
-export function appendToComment(_existing: string, _addition: string): string {
-  throw new Error('not implemented (#14)');
+/** The annotation comment after "Add to annotation" appends `addition`, below what is there. */
+export function appendToComment(existing: string, addition: string): string {
+  if (existing.trim() === '') return addition;
+  return `${existing.replace(/\s+$/, '')}\n\n${addition}`;
 }
 
 export type CardSaveButton = 'save-as-annotation' | 'add-to-annotation' | 'none';
 
-/** Which save-to-PDF button a card shows under a finished Answer. */
-export function cardSaveButton(_source: { annotationKey?: string; editable?: boolean }): CardSaveButton {
-  throw new Error('not implemented (#14)');
+/**
+ * Which save-to-PDF button a card shows under a finished Answer: a fresh
+ * highlight gets a new Saved Annotation; an annotation the card was opened
+ * from gets the Q&A appended, unless it is read-only.
+ */
+export function cardSaveButton(source: { annotationKey?: string; editable?: boolean }): CardSaveButton {
+  if (!source.annotationKey) return 'save-as-annotation';
+  return source.editable ? 'add-to-annotation' : 'none';
 }
