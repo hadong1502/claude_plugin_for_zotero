@@ -54,6 +54,8 @@ export interface SelectionContext {
   pageLabel?: string;
   /** Base64 PNG of the highlighted region. */
   imagePng?: string;
+  /** The annotation's comment, when the Selection comes from an annotation (#14). */
+  comment?: string;
 }
 
 /** Input to the Context Builder. */

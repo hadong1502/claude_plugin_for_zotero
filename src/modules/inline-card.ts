@@ -9,6 +9,7 @@
 // carries the question, its Answer and its session into the item's Thread and
 // closes the card. The card's "Use full paper" toggle (#8) starts unchecked
 // and goes with every question, Quick Actions included.
+import { cardSaveButton } from '../core/annotation-question';
 import type { AskController, PaperSource } from '../core/ask-controller';
 import { renderAnswerHtml } from '../core/answer-renderer';
 import { placeCard, visibleMarks, type Box, type CardSize } from '../core/card-placement';
@@ -51,6 +52,10 @@ const KATEX_CSS = 'chrome://claudeforzotero-katex/content/katex.min.css';
 
 /** The Selection as captured when the Ask Claude Button was pressed. */
 export interface CapturedSelection extends SelectionContext {
+  /** The annotation the card was opened from (#14); absent for a fresh highlight. */
+  annotationKey?: string;
+  /** Whether that annotation can be written to (#14). */
+  editable?: boolean;
   pageIndex?: number;
   /** PDF-space rectangles of the Selection on its page. */
   rects: number[][];
@@ -186,9 +191,12 @@ export class InlineCard {
       () => this.#saveShown((turn) => this.#deps.saveNote(turn)),
       deps.logError,
     );
+    // A fresh highlight gets a new Saved Annotation; a card opened from an
+    // annotation appends to it, or offers nothing if it is read-only (#14).
+    const saveToPdf = cardSaveButton(selection);
     this.#saveAnnotation = new SaveButton(
       this.#el('button', 'cfz-card-save-annotation'),
-      'Save as annotation',
+      saveToPdf === 'add-to-annotation' ? 'Add to annotation' : 'Save as annotation',
       () => this.#saveShown((turn) => this.#deps.saveAnnotation(turn)),
       deps.logError,
     );
@@ -197,7 +205,9 @@ export class InlineCard {
     this.#continue.addEventListener('click', () => this.#continueInPane());
     this.#saves = this.#el('div', 'cfz-card-saves');
     this.#saves.hidden = true;
-    this.#saves.append(this.#saveNote.element, this.#saveAnnotation.element, this.#continue);
+    this.#saves.append(this.#saveNote.element);
+    if (saveToPdf !== 'none') this.#saves.append(this.#saveAnnotation.element);
+    this.#saves.append(this.#continue);
     this.#body.append(this.#question, this.#answer, this.#status, this.#saves);
     // Links in Answers never navigate the reader; allowed ones open in the
     // system browser.
@@ -337,7 +347,7 @@ export class InlineCard {
     const ask = ++this.#asks;
     const model = this.#model;
     const useFullPaper = this.#fullPaper.checked;
-    const { text, pageLabel } = this.selection;
+    const { text, pageLabel, comment } = this.selection;
     // The snapshot and the PDF lookup are usually ready by now; the snapshot
     // resolves within its timeout either way, and without it the question
     // goes text-only (#8).
@@ -348,7 +358,7 @@ export class InlineCard {
       .then(([imagePng, paper]) => {
         if (this.#closed || ask !== this.#asks) return;
         const selection: SelectionContext =
-          imagePng === undefined ? { text, pageLabel } : { text, pageLabel, imagePng };
+          imagePng === undefined ? { text, pageLabel, comment } : { text, pageLabel, comment, imagePng };
         return controller.ask(this.key, item, question, model, {
           source: 'inline',
           quickAction,

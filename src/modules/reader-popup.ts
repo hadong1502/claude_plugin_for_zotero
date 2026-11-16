@@ -13,20 +13,21 @@
 // `_activeSecondaryView`) is the PDF view, whose `getClientRectForPopup(position)`
 // gives the Selection's rectangle in its iframe (`_iframe`, `_iframeWindow`),
 // and whose `#viewerContainer` scrolls and `#viewer` resizes on zoom.
+import { annotationSelection, canAskAboutAnnotations } from '../core/annotation-question';
 import { AskController } from '../core/ask-controller';
 import type { Box } from '../core/card-placement';
 import { itemContextFrom, type ItemLike } from '../core/item-context';
 import { ClaudeRunner } from '../core/runner';
 import type { SelectionAnnotation } from '../core/saving';
 import { ThreadStore } from '../core/thread-store';
-import type { ItemContext } from '../core/types';
+import type { ItemContext, Turn } from '../core/types';
 import { getPluginInfo } from '../plugin-info';
 import { continueInPane, itemPaper } from './claude-pane';
 import { getCliPath } from './cli-locator';
 import { ensureCliWorkdir } from './cli-workdir';
 import { guard, logError } from './errors';
 import { InlineCard, removeStyles, type CapturedSelection, type CardAnchor } from './inline-card';
-import { saveAnnotation, saveAnswerNote } from './library-writer';
+import { addToAnnotation, saveAnnotation, saveAnswerNote } from './library-writer';
 import { getPref } from './prefs';
 import { snapshotSelection } from './selection-snapshot';
 import { createSubprocessPort } from './subprocess-port';
@@ -60,6 +61,8 @@ interface PopupAnnotation {
 
 interface Registration {
   handler: PopupHandler;
+  /** Ask Claude in an annotation's right-click menu (#14). */
+  menuHandler: AnnotationMenuHandler;
   store: ThreadStore;
   controller: AskController;
   quitObserver: { observe(): void };
@@ -85,13 +88,15 @@ export function registerReaderPopup(): void {
       settings: () => ({ aboutMe: getPref('aboutMe'), answerLanguage: getPref('answerLanguage') }),
     });
     const handler: PopupHandler = (event) => guard(() => onSelectionPopup(event));
+    const menuHandler: AnnotationMenuHandler = (event) => guard(() => onAnnotationMenu(event));
     // Quitting Zotero skips the plugin's shutdown hook, so stop any running
     // CLI here (#1 user story 58).
     const quitObserver = { observe: () => guard(() => controller.cancelAll()) };
-    const current: Registration = { handler, store, controller, quitObserver, card: null, nextKey: 1 };
+    const current: Registration = { handler, menuHandler, store, controller, quitObserver, card: null, nextKey: 1 };
     registration = current;
     Services.obs.addObserver(quitObserver, 'quit-application');
     Zotero.Reader.registerEventListener('renderTextSelectionPopup', handler, id);
+    Zotero.Reader.registerEventListener('createAnnotationContextMenu', menuHandler, id);
   } catch (e) {
     logError(e);
   }
@@ -102,6 +107,7 @@ export function unregisterReaderPopup(): void {
   registration = undefined;
   if (!current) return;
   guard(() => Zotero.Reader.unregisterEventListener('renderTextSelectionPopup', current.handler));
+  guard(() => Zotero.Reader.unregisterEventListener('createAnnotationContextMenu', current.menuHandler));
   guard(() => current.card?.close());
   current.card = null;
   guard(() => current.controller.cancelAll());
@@ -134,6 +140,10 @@ interface ReaderLike {
   /** The reader's tab (xpcom/reader.js). */
   tabID?: string;
   _internalReader?: InternalReaderLike;
+  /** The reader document's window, where the Inline Card lives (xpcom/reader.js). */
+  _iframeWindow?: Window | null;
+  /** Scrolls the reader to a location (xpcom/reader.js). */
+  navigate?(location: { annotationID: string }): unknown;
 }
 
 function openCard(
@@ -147,7 +157,26 @@ function openCard(
   // Captured now, so the card outlives the popup.
   const selection = captureSelection(annotation);
   const selectionAnnotation = captureAnnotation(annotation);
-  const anchor = createAnchor(reader, doc, annotation, button);
+  const anchor = popupAnchor(reader, doc, annotation, button);
+  openCardWith(current, reader, doc, selection, anchor, async (turn) => {
+    if (!selectionAnnotation) throw new Error('Inline Card: the Selection was not captured');
+    return saveAnnotation(reader._item, selectionAnnotation, turn.question, turn.answer);
+  });
+}
+
+/**
+ * Opens the one Inline Card about `selection`. `saveToPdf` is what the card's
+ * save-to-PDF button does: a new Saved Annotation, or appending to the
+ * annotation the card was opened from (#14).
+ */
+function openCardWith(
+  current: Registration,
+  reader: ReaderLike,
+  doc: Document,
+  selection: CapturedSelection,
+  anchor: CardAnchor,
+  saveToPdf: (turn: Turn) => Promise<unknown>,
+): void {
   const attachment = reader._item;
   // Started once, here; every question of the card awaits it (#8).
   const selectionSnapshot =
@@ -173,12 +202,79 @@ function openCard(
       if (current.card === card) current.card = null;
     },
     saveNote: async (turn) => saveAnswerNote(await noteItemOf(attachment), turn),
-    saveAnnotation: async (turn) => {
-      if (!selectionAnnotation) throw new Error('Inline Card: the Selection was not captured');
-      return saveAnnotation(attachment, selectionAnnotation, turn.question, turn.answer);
-    },
+    saveAnnotation: saveToPdf,
     continueInPane: (exchange) => continueInPane(attachment, exchange, reader.tabID),
   });
+}
+
+type AnnotationMenuHandler = _ZoteroTypes.Reader.EventHandler<'createAnnotationContextMenu'>;
+type AnnotationMenuEvent = _ZoteroTypes.Reader.EventParams<'createAnnotationContextMenu'>;
+
+/**
+ * Adds Ask Claude to an annotation's right-click menu (page or sidebar) when
+ * exactly one highlight, underline or Area Annotation of a PDF is selected (#14).
+ */
+function onAnnotationMenu(event: AnnotationMenuEvent): void {
+  const { reader, params, append } = event;
+  const keys = Array.from((params as { ids?: ArrayLike<unknown> }).ids ?? [], String);
+  const libraryID = (reader as unknown as ReaderLike)._item.libraryID;
+  const items = keys.map((key) => Zotero.Items.getByLibraryAndKey(libraryID, key) || null);
+  const types = items.map((item) => (item && item.isAnnotation() ? String(item.annotationType) : ''));
+  if (!canAskAboutAnnotations({ readerType: String(reader.type), annotationTypes: types })) return;
+  const item = items[0]!;
+  append({
+    label: 'Ask Claude',
+    onCommand: () =>
+      guard(() => {
+        // Context-menu events carry no `doc` (only the render events do), so
+        // the card goes into the reader's own document (#14).
+        const readerLike = reader as unknown as ReaderLike;
+        const doc = readerLike._iframeWindow?.document;
+        if (!doc) throw new Error('Inline Card: the reader document is not available');
+        openAnnotationCard(readerLike, doc, item);
+      }),
+  });
+}
+
+/** Opens the Inline Card about an existing annotation (#14). */
+function openAnnotationCard(reader: ReaderLike, doc: Document, item: Zotero.Item): void {
+  const current = registration;
+  if (!current) return;
+  // isEditable covers a read-only library and another member's group annotation (#14).
+  const editable = item.isEditable() && !item.annotationIsExternal && !reader._item.deleted;
+  const data = annotationSelection({
+    type: String(item.annotationType),
+    text: item.annotationText ?? '',
+    comment: item.annotationComment ?? '',
+    pageLabel: item.annotationPageLabel ?? '',
+    position: item.annotationPosition ?? '',
+    key: item.key,
+    editable,
+  });
+  if (!data) {
+    logError(new Error(`Inline Card: annotation ${item.key} has no usable position`));
+    return;
+  }
+  const selection: CapturedSelection = { ...data, pageLabel: data.pageLabel === '' ? undefined : data.pageLabel };
+  const win = doc.defaultView;
+  // Made in the reader's window so its view code can read the position.
+  const position = win
+    ? Components.utils.cloneInto({ pageIndex: data.pageIndex, rects: data.rects }, win)
+    : undefined;
+  // Brings the annotation into view; a failure only loses the scroll (#14).
+  guard(() => {
+    void Promise.resolve(reader.navigate?.({ annotationID: item.key })).catch(logError);
+  });
+  const anchor = createAnchor(reader, doc, position, {
+    secondary: false,
+    popupBox: null,
+    fallbackView: toBox(doc.documentElement.getBoundingClientRect()),
+    marks: false,
+    showOffscreen: true,
+  });
+  openCardWith(current, reader, doc, selection, anchor, (turn) =>
+    addToAnnotation(item.libraryID, data.annotationKey, turn.question, turn.answer),
+  );
 }
 
 /**
@@ -230,25 +326,60 @@ function captureSelection(annotation: PopupAnnotation): CapturedSelection {
   return { text, pageLabel, pageIndex, rects };
 }
 
+/** Where an anchor looks for the Selection, and where the card goes if the view can't be measured. */
+interface AnchorPlace {
+  /** The Selection is in the split view's second pane. */
+  secondary: boolean;
+  /** Fallback anchor (the popup's box), or null for the view's top centre. */
+  popupBox: Box | null;
+  /** Fallback view box. */
+  fallbackView: Box | null;
+  /** Draw the Selection marker; off for an annotation, which shows itself (#14). */
+  marks: boolean;
+  /**
+   * If the first measure puts the Selection outside the view, place the card
+   * at the fallback place rather than hiding it; later measures hide it as
+   * usual (#14, an annotation may still be scrolling into view).
+   */
+  showOffscreen?: boolean;
+}
+
+/** The anchor for a card opened from the selection popup. */
+function popupAnchor(reader: ReaderLike, doc: Document, annotation: PopupAnnotation, button: HTMLElement): CardAnchor {
+  return createAnchor(reader, doc, annotation.position, {
+    secondary: !!button.closest('.secondary-view'),
+    popupBox: toBox(button.closest('.selection-popup')?.getBoundingClientRect()),
+    fallbackView:
+      toBox(button.closest('.primary-view, .secondary-view')?.getBoundingClientRect()) ??
+      toBox(doc.documentElement.getBoundingClientRect()),
+    marks: true,
+  });
+}
+
 /**
- * Tracks the Selection through the PDF view that showed the popup. If the
- * view cannot be measured, the card stays where the popup was.
+ * Tracks the Selection through a PDF view of the reader. If the view cannot
+ * be measured, the card stays at the fallback place.
  */
 function createAnchor(
   reader: ReaderLike,
   doc: Document,
-  annotation: PopupAnnotation,
-  button: HTMLElement,
+  position: { pageIndex?: unknown; rects?: unknown } | undefined,
+  place: AnchorPlace,
 ): CardAnchor {
-  const primary = !button.closest('.secondary-view');
   const internal = reader._internalReader;
-  const view = primary ? internal?._activePrimaryView : internal?._activeSecondaryView;
-  const position = annotation.position;
-
-  const popupBox = toBox(button.closest('.selection-popup')?.getBoundingClientRect());
-  const fallbackView =
-    toBox(button.closest('.primary-view, .secondary-view')?.getBoundingClientRect()) ??
-    toBox(doc.documentElement.getBoundingClientRect());
+  const view = place.secondary ? internal?._activeSecondaryView : internal?._activePrimaryView;
+  const fallbackView = place.fallbackView;
+  const popupBox =
+    place.popupBox ??
+    (fallbackView
+      ? {
+          // The view's top centre, when there is no popup to fall back on.
+          left: (fallbackView.left + fallbackView.right) / 2,
+          right: (fallbackView.left + fallbackView.right) / 2,
+          top: fallbackView.top + 40,
+          bottom: fallbackView.top + 40,
+        }
+      : null);
 
   const measureView = (): { anchor: Box; view: Box } | null => {
     if (!view?.getClientRectForPopup || !view._iframe || !position) return null;
@@ -263,18 +394,27 @@ function createAnchor(
     };
   };
 
+  let first = true;
+  const fallback = () => (popupBox && fallbackView ? { anchor: popupBox, view: fallbackView } : null);
   return {
     measure() {
+      const isFirst = first;
+      first = false;
       try {
         const measured = measureView();
-        if (measured) return measured;
+        if (measured) {
+          const { anchor: a, view: v } = measured;
+          const inside = a.bottom > v.top && a.top < v.bottom && a.right > v.left && a.left < v.right;
+          if (isFirst && place.showOffscreen && !inside) return fallback() ?? measured;
+          return measured;
+        }
       } catch (e) {
         logError(e);
       }
       return popupBox && fallbackView ? { anchor: popupBox, view: fallbackView } : null;
     },
     marks() {
-      if (!view?.getClientRectForPopup || !view._iframe || !position) return [];
+      if (!place.marks || !view?.getClientRectForPopup || !view._iframe || !position) return [];
       const rects = position.rects as ArrayLike<ArrayLike<unknown>> | undefined;
       const win = doc.defaultView;
       if (!rects || !win) return [];
