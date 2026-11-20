@@ -1,4 +1,4 @@
-Wassup! I thought a Claude CLI-native plugin for Zotero would be helpful, since we all know that Zotero article PDF viewer and note-taking is awesome - many of us Zotero for this purpose. So here it goes. I recommend you fine tune it to match your usage and token budget (Claude can help with this, too). Take care!
+Hey there! I thought a Claude CLI-native plugin for Zotero would be helpful, since we all know that Zotero article PDF viewer and note-taking is awesome - many of us Zotero for this purpose. So here it goes. I recommend you fine tune it to match your usage and token budget (Claude can help with this, too). Take care!
 
 # Claude for Zotero
 
