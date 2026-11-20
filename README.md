@@ -5,6 +5,13 @@ your existing Claude subscription, by running the locally installed Claude Code
 CLI in the background. Domain terms are defined in
 [docs/GLOSSARY.md](docs/GLOSSARY.md); design decisions are in [docs/adr/](docs/adr/).
 
+## Demo
+
+[![Demo: asking about a paper in the Claude Pane, then asking about a figure and a text selection with the Inline Card](docs/media/demo-poster.jpg)](docs/media/demo.mp4)
+
+Click the image to watch the demo video (3 min 49 s): a question in the Claude
+Pane, then Ask Claude on a selected figure and on a text selection.
+
 ## What it does
 
 - **Claude Pane:** a Claude section in the item pane and in the reader's
