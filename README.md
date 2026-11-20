@@ -1,3 +1,5 @@
+Wassup! I thought a Claude CLI-native plugin for Zotero would be helpful, since we all know that Zotero article PDF viewer and note-taking is awesome - many of us Zotero for this purpose. So here it goes. I recommend you fine tune it to match your usage and token budget (Claude can help with this, too). Take care!
+
 # Claude for Zotero
 
 A Zotero 10 plugin that answers questions about the paper you are reading with
@@ -5,12 +7,9 @@ your existing Claude subscription, by running the locally installed Claude Code
 CLI in the background. Domain terms are defined in
 [docs/GLOSSARY.md](docs/GLOSSARY.md); design decisions are in [docs/adr/](docs/adr/).
 
-## Demo
+## Demo use cases
 
-[![Demo: asking about a paper in the Claude Pane, then asking about a figure and a text selection with the Inline Card](docs/media/demo-poster.jpg)](docs/media/demo.mp4)
-
-Click the image to watch the demo video (3 min 49 s): a question in the Claude
-Pane, then Ask Claude on a selected figure and on a text selection.
+https://github.com/user-attachments/assets/1c9dc8e5-b965-4b2f-b78a-07df6ad961e9
 
 ## What it does
 
